@@ -3,6 +3,8 @@ import Sidebar from './components/Sidebar';
 import Dashboard from './pages/Dashboard';
 import InboundList from './pages/InboundList';
 import ClientList from './pages/ClientList';
+import Settings from './pages/Settings';
+import Logs from './pages/Logs';
 
 export default function App() {
   return (
@@ -22,6 +24,8 @@ export default function App() {
               <Route path="/" element={<Dashboard />} />
               <Route path="/inbounds" element={<InboundList />} />
               <Route path="/clients" element={<ClientList />} />
+              <Route path="/settings" element={<Settings />} />
+              <Route path="/logs" element={<Logs />} />
               {/* Fallback */}
               <Route path="*" element={<Dashboard />} />
             </Routes>

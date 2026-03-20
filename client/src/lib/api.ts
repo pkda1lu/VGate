@@ -12,4 +12,9 @@ export const getClients = () => api.get('/clients');
 export const createClient = (data: any) => api.post('/clients', data);
 export const deleteClient = (id: string) => api.delete(`/clients/${id}`);
 
+export const getSettings = () => api.get('/settings');
+export const updateSettings = (data: Record<string, string>) => api.post('/settings/bulk', data);
+export const restartXray = () => api.post('/settings/restart');
+export const getLogs = () => api.get('/settings/logs');
+
 export default api;

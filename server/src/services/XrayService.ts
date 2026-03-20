@@ -2,12 +2,13 @@ import { spawn, ChildProcess } from 'child_process';
 import * as fs from 'fs-extra';
 import path from 'path';
 import { db } from '../db';
+import { SettingsService } from './SettingsService';
 
 export class XrayService {
   private static instance: XrayService;
   private process: ChildProcess | null = null;
-  private configPath: string = path.join(process.cwd(), 'xray_config.json');
-  private xrayBinary: string = process.platform === 'win32' ? 'xray.exe' : '/usr/local/bin/xray';
+  private logs: string[] = [];
+  private readonly maxLogs = 500;
 
   private constructor() {}
 
@@ -79,27 +80,58 @@ export class XrayService {
       }
     };
 
-    await fs.writeJSON(this.configPath, config, { spaces: 2 });
-    return this.configPath;
+    const settingsService = SettingsService.getInstance();
+    const configPath = await settingsService.getSetting('xray_config_path', path.join(process.cwd(), 'xray_config.json'));
+
+    await fs.writeJSON(configPath!, config, { spaces: 2 });
+    return configPath!;
   }
 
   public async start() {
-    await this.generateConfig();
+    const configPath = await this.generateConfig();
     this.stop();
 
-    if (!fs.existsSync(this.xrayBinary)) {
-      console.warn(`Xray binary not found at ${this.xrayBinary}. Skipping process start.`);
+    const settingsService = SettingsService.getInstance();
+    const xrayBinary = await settingsService.getSetting('xray_binary', process.platform === 'win32' ? 'xray.exe' : '/usr/local/bin/xray');
+
+    if (!fs.existsSync(xrayBinary!)) {
+      this.addLog(`[Error] Xray binary not found at ${xrayBinary}`);
+      console.warn(`Xray binary not found at ${xrayBinary}. Skipping process start.`);
       return;
     }
 
-    this.process = spawn(this.xrayBinary, ['-c', this.configPath], {
-      stdio: 'inherit'
+    this.addLog(`[System] Starting Xray core with binary: ${xrayBinary}`);
+    this.process = spawn(xrayBinary!, ['-c', configPath], {
+      stdio: ['ignore', 'pipe', 'pipe']
     });
 
-    this.process.on('close', (code) => {
+    this.process.stdout?.on('data', (data: Buffer) => {
+      this.addLog(data.toString());
+    });
+
+    this.process.stderr?.on('data', (data: Buffer) => {
+      this.addLog(`[Error] ${data.toString()}`);
+    });
+
+    this.process.on('close', (code: number | null) => {
+      this.addLog(`[System] Xray process exited with code ${code}`);
       console.log(`Xray process exited with code ${code}`);
       this.process = null;
     });
+  }
+
+  private addLog(message: string) {
+    const lines = message.split('\n').filter(l => l.trim());
+    for (const line of lines) {
+        this.logs.push(`[${new Date().toLocaleTimeString()}] ${line}`);
+    }
+    if (this.logs.length > this.maxLogs) {
+      this.logs = this.logs.slice(this.logs.length - this.maxLogs);
+    }
+  }
+
+  public getLogs() {
+    return this.logs;
   }
 
   public stop() {

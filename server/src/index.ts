@@ -8,6 +8,7 @@ import { db } from './db';
 import { eq } from 'drizzle-orm';
 import inboundRoutes from './routes/inbound';
 import clientRoutes from './routes/client';
+import settingsRoutes from './routes/settings';
 
 const fastify = Fastify({
   logger: {
@@ -38,6 +39,7 @@ async function start() {
 
     await fastify.register(inboundRoutes, { prefix: '/api/inbounds' });
     await fastify.register(clientRoutes, { prefix: '/api/clients' });
+    await fastify.register(settingsRoutes, { prefix: '/api/settings' });
 
     fastify.get('/health', async () => {
       return { status: 'ok', time: new Date() };
