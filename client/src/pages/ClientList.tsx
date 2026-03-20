@@ -102,7 +102,8 @@ export default function ClientList() {
     const inbound = inbounds?.find((i: any) => i.id === client.inboundId);
     if (!inbound) return '';
 
-    // Use server_ip from settings, fall back to panel hostname
+    // Use panel domain by default (window.location.hostname), 
+    // but allow override if server_ip is specifically set in system settings.
     const host = (settings?.server_ip) || window.location.hostname;
 
     const port = inbound.port;
