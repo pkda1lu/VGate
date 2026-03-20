@@ -1,15 +1,16 @@
-import { AlertTriangle, ShieldOff, Globe, ArrowRight } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { AlertTriangle, ShieldOff, Globe, ArrowRight } from 'lucide-react';
 
 export default function SSLWarning() {
     const [isIP, setIsIP] = useState(false);
     const [isHTTP, setIsHTTP] = useState(false);
+    const navigate = useNavigate();
 
     useEffect(() => {
         const hostname = window.location.hostname;
         const protocol = window.location.protocol;
         
-        // Simple IP regex
         const ipRegex = /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/;
         setIsIP(ipRegex.test(hostname));
         setIsHTTP(protocol === 'http:');
@@ -34,8 +35,7 @@ export default function SSLWarning() {
 
                 <div className="space-y-4">
                     <p className="text-sm font-bold text-white/90 leading-relaxed">
-                        {isHTTP && "Your connection is unencrypted (HTTP). Sensitive credentials could be intercepted."}
-                        {isIP && " accessing via direct IP is not recommended for production environments."}
+                        {isHTTP ? "Your connection is unencrypted (HTTP). Sensitive credentials could be intercepted." : "Accessing via direct IP is not recommended for production environments."}
                     </p>
                     
                     <div className="bg-orange-500/5 p-4 rounded-2xl border border-orange-500/10 space-y-3">
@@ -50,8 +50,11 @@ export default function SSLWarning() {
                     </div>
                 </div>
 
-                <button className="w-full bg-orange-500/10 hover:bg-orange-500/20 border border-orange-500/20 text-orange-400 py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all flex items-center justify-center gap-2 group">
-                    View Configuration Documentation <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                <button 
+                  onClick={() => navigate('/settings')}
+                  className="w-full bg-orange-500/10 hover:bg-orange-500/20 border border-orange-500/20 text-orange-400 py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all flex items-center justify-center gap-2 group"
+                >
+                    Configure Secure SSL <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                 </button>
             </div>
         </div>
