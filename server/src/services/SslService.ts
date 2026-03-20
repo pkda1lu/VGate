@@ -36,7 +36,20 @@ export class SslService {
             const keyPath = `/etc/letsencrypt/live/${domain}/privkey.pem`;
 
             if (await fs.pathExists(certPath) && await fs.pathExists(keyPath)) {
-                return { success: true, log };
+                // Save to settings
+                const { SettingsService } = await import('./SettingsService');
+                const settingsService = SettingsService.getInstance();
+                await settingsService.updateSetting('ssl_cert', certPath);
+                await settingsService.updateSetting('ssl_key', keyPath);
+                await settingsService.updateSetting('panel_domain', domain);
+
+                // Auto-restart after 2 seconds to apply SSL
+                setTimeout(() => {
+                    console.log("[SSL] Restarting panel to apply HTTPS...");
+                    process.exit(0);
+                }, 2000);
+
+                return { success: true, log: log + "\n\n[DONE] SSL Certificates saved. The panel will RESTART AUTOMATICALLY in 2 seconds to apply HTTPS. Please refresh the page after a few moments." };
             }
 
             return { success: false, log: "Certificates were not created. Full log:\n" + log };

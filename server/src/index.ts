@@ -12,16 +12,31 @@ import settingsRoutes from './routes/settings';
 import systemRoutes from './routes/system';
 import authRoutes from './routes/auth';
 
-const fastify = Fastify({
-  logger: {
-    transport: {
-      target: 'pino-pretty'
-    }
-  }
-});
+import fs from 'fs-extra';
 
 async function start() {
+  let fastify: any;
   try {
+    const { SettingsService } = await import('./services/SettingsService');
+    const settingsService = SettingsService.getInstance();
+    
+    // SSL detection
+    const sslCert = await settingsService.getSetting('ssl_cert');
+    const sslKey = await settingsService.getSetting('ssl_key');
+    let httpsOptions: any = undefined;
+
+    if (sslCert && sslKey && fs.existsSync(sslCert) && fs.existsSync(sslKey)) {
+        httpsOptions = {
+            cert: fs.readFileSync(sslCert),
+            key: fs.readFileSync(sslKey)
+        };
+    }
+
+    fastify = Fastify({
+      https: httpsOptions,
+      logger: { transport: { target: 'pino-pretty' } }
+    });
+
     await fastify.register(cors);
     
     // Serve static files (production build of the client)
@@ -31,7 +46,7 @@ async function start() {
     });
 
     // SPA support: serve index.html for unknown routes
-    fastify.setNotFoundHandler((request, reply) => {
+    fastify.setNotFoundHandler((request: any, reply: any) => {
       if (request.url.startsWith('/api')) {
         reply.code(404).send({ error: 'Not Found' });
       } else {
@@ -46,7 +61,7 @@ async function start() {
     await fastify.register(authRoutes, { prefix: '/api/auth' });
 
     // Auth Middleware
-    fastify.addHook('onRequest', async (request, reply) => {
+    fastify.addHook('onRequest', async (request: any, reply: any) => {
         if (request.url.startsWith('/api') && !request.url.startsWith('/api/auth') && request.url !== '/health') {
             const token = request.headers.authorization?.replace('Bearer ', '');
             if (!token) {
@@ -67,9 +82,6 @@ async function start() {
     // Start Xray
     const xray = XrayService.getInstance();
     
-    // Initialize default settings if needed
-    const { SettingsService } = await import('./services/SettingsService');
-    const settingsService = SettingsService.getInstance();
     const defaults = {
       xray_binary: process.platform === 'win32' ? 'xray.exe' : '/usr/local/bin/xray',
       xray_config_path: path.join(process.cwd(), 'xray_config.json'),
