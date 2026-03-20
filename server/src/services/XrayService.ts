@@ -1,4 +1,4 @@
-import { spawn, ChildProcess } from 'child_process';
+import { spawn, ChildProcess, execSync } from 'child_process';
 import * as fs from 'fs-extra';
 import path from 'path';
 import { db } from '../db';
@@ -26,7 +26,16 @@ export class XrayService {
       }
     });
 
-    const xrayInbounds = inboundsData.map(inbound => {
+    const xrayInbounds = inboundsData
+      .filter(inbound => {
+        const port = Number(inbound.port);
+        if (port <= 0 || port > 65535 || !Number.isInteger(port)) {
+          console.warn(`[XrayService] Skipping inbound '${inbound.tag}' with invalid port: ${inbound.port}`);
+          return false;
+        }
+        return true;
+      })
+      .map(inbound => {
       const settings = JSON.parse(inbound.settings);
       
       // Map clients from our DB into the settings expected by Xray
@@ -58,34 +67,18 @@ export class XrayService {
     // Load config sections from settings
     const logSection = JSON.parse(await settingsService.getSetting('xray_config_log', '{"loglevel":"warning"}') as string);
     const dnsSection = JSON.parse(await settingsService.getSetting('xray_config_dns', '{"servers":["1.1.1.1"]}') as string);
-    const outboundsSection = JSON.parse(await settingsService.getSetting('xray_config_outbounds', '[{"protocol":"freedom","tag":"direct"}]') as string);
+    const outboundsSection = JSON.parse(await settingsService.getSetting('xray_config_outbounds', '[{"protocol":"freedom","tag":"direct"},{"protocol":"blackhole","tag":"blocked"}]') as string);
     const routingSection = JSON.parse(await settingsService.getSetting('xray_config_routing', '{"rules":[]}') as string);
     const policySection = JSON.parse(await settingsService.getSetting('xray_config_policy', '{"levels":{"0":{"statsUserUplink":true,"statsUserDownlink":true}}}') as string);
 
-    // Protection flags
-    const blockBittorrent = await settingsService.getSetting('block_bittorrent') === 'true';
-    const blockPrivateIps = await settingsService.getSetting('block_private_ips') === 'true';
-    const blockAds = await settingsService.getSetting('block_ads') === 'true';
-
-    // Ensure base api rule exists
+    // Ensure api rule exists
+    if (!routingSection.rules) routingSection.rules = [];
     if (!routingSection.rules.find((r: any) => r.inboundTag?.[0] === 'api')) {
         routingSection.rules.unshift({ type: "field", inboundTag: ["api"], outboundTag: "api" });
     }
 
-    // Add protection rules if enabled
-    if (blockBittorrent) {
-        routingSection.rules.push({ type: "field", protocol: ["bittorrent"], outboundTag: "blocked" });
-    }
-    if (blockPrivateIps) {
-        routingSection.rules.push({ type: "field", ip: ["geoip:private"], outboundTag: "blocked" });
-    }
-    if (blockAds) {
-        routingSection.rules.push({ type: "field", domain: ["geosite:category-ads-all"], outboundTag: "blocked" });
-    }
-
-    // Ensure blackhole outbound exists if protection rules are active
-    const hasBlockedRules = blockBittorrent || blockPrivateIps || blockAds;
-    if (hasBlockedRules && !outboundsSection.find((o: any) => o.tag === 'blocked')) {
+    // Ensure blackhole outbound exists
+    if (!outboundsSection.find((o: any) => o.tag === 'blocked')) {
         outboundsSection.push({ protocol: "blackhole", tag: "blocked" });
     }
 
@@ -131,6 +124,18 @@ export class XrayService {
       return;
     }
 
+    // Validate config before launching
+    try {
+      const testResult = execSync(`"${xrayBinary}" -test -config "${configPath}"`, { timeout: 10000 }).toString();
+      this.addLog(`[System] Config validation OK: ${testResult.trim()}`);
+    } catch (testErr: any) {
+      const errMsg = (testErr.stdout?.toString() || '') + (testErr.stderr?.toString() || '') || testErr.message;
+      this.addLog(`[Fatal] Xray config validation FAILED — check your inbound settings!`);
+      this.addLog(`[Fatal] ${errMsg}`);
+      console.error('Xray config test failed:', errMsg);
+      return;
+    }
+
     this.addLog(`[System] Starting Xray core with binary: ${xrayBinary}`);
     this.process = spawn(xrayBinary!, ['-c', configPath], {
       stdio: ['ignore', 'pipe', 'pipe']
@@ -141,7 +146,7 @@ export class XrayService {
     });
 
     this.process.stderr?.on('data', (data: Buffer) => {
-      this.addLog(`[Error] ${data.toString()}`);
+      this.addLog(`[Xray] ${data.toString()}`);
     });
 
     this.process.on('close', (code: number | null) => {

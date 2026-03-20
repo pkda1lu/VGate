@@ -68,7 +68,9 @@ async function start() {
 
     // Auth Middleware
     fastify.addHook('onRequest', async (request: any, reply: any) => {
-        if (request.url.startsWith('/api') && !request.url.startsWith('/api/auth') && request.url !== '/health') {
+        const bypass = ['/api/auth', '/api/settings/xray-config', '/health'];
+        const isBypassed = bypass.some(p => request.url.startsWith(p));
+        if (request.url.startsWith('/api') && !isBypassed) {
             const token = request.headers.authorization?.replace('Bearer ', '');
             if (!token) {
                 return reply.code(401).send({ error: 'Unauthorized' });

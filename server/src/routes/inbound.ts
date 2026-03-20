@@ -23,6 +23,12 @@ export default async function inboundRoutes(fastify: FastifyInstance, options: F
       return reply.code(400).send({ error: 'Missing required fields' });
     }
 
+    const port = parseInt(body.port);
+    if (isNaN(port) || port <= 0 || port > 65535) {
+      return reply.code(400).send({ error: 'Invalid port: must be between 1 and 65535' });
+    }
+    body.port = port;
+
     let streamSettings = body.stream || {};
     
     // Auto-generate Reality keys for VLESS inbounds
