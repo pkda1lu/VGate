@@ -52,6 +52,20 @@ async function start() {
     
     // Start Xray
     const xray = XrayService.getInstance();
+    
+    // Initialize default settings if needed
+    const { SettingsService } = await import('./services/SettingsService');
+    const settingsService = SettingsService.getInstance();
+    const defaults = {
+      xray_binary: process.platform === 'win32' ? 'xray.exe' : '/usr/local/bin/xray',
+      xray_config_path: path.join(process.cwd(), 'xray_config.json'),
+      panel_port: '4000'
+    };
+    for (const [key, value] of Object.entries(defaults)) {
+      const existing = await settingsService.getSetting(key);
+      if (!existing) await settingsService.updateSetting(key, value);
+    }
+
     await xray.start();
 
     // Start Traffic Polling
