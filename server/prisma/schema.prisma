@@ -1,0 +1,52 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model Inbound {
+  id        Int      @id @default(autoincrement())
+  tag       String   @unique
+  protocol  String
+  port      Int
+  settings  String
+  sniffing  String
+  stream    String
+  clients   Client[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Client {
+  id        String   @id @default(uuid())
+  inbound   Inbound  @relation(fields: [inboundId], references: [id])
+  inboundId Int
+  email     String   @unique
+  uuid      String
+  flow      String?
+  limitIp   Int      @default(0)
+  totalGb   Float    @default(0)
+  expiry    DateTime?
+  enabled   Boolean  @default(true)
+  traffic   Traffic?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Traffic {
+  id        Int    @id @default(autoincrement())
+  client    Client @relation(fields: [clientId], references: [id])
+  clientId  String @unique
+  up        BigInt @default(0)
+  down      BigInt @default(0)
+  total     BigInt @default(0)
+}
+
+model Setting {
+  id    Int    @id @default(autoincrement())
+  key   String @unique
+  value String
+}
