@@ -475,6 +475,14 @@ function SystemSettings({ formData, setFormData }: any) {
                             value={formData.panel_port || '4000'}
                             onChange={(v: string) => setFormData({ ...formData, panel_port: v })}
                         />
+                        <SettingInput
+                            label="Server IP / Domain (для клиентских ссылок)"
+                            description="IP или домен VPS — используется в ссылках для клиентов. Не домен панели!"
+                            icon={<Globe className="w-4 h-4" />}
+                            value={formData.server_ip || ''}
+                            onChange={(v: string) => setFormData({ ...formData, server_ip: v })}
+                            placeholder="84.54.31.161"
+                        />
                     </div>
                 </section>
 

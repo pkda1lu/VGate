@@ -14,13 +14,14 @@ import {
 } from 'lucide-react';
 import useSWR from 'swr';
 import { useState } from 'react';
-import { getClients, deleteClient, createClient, updateClient, getInbounds } from '../lib/api';
+import { getClients, deleteClient, createClient, updateClient, getInbounds, getSettings } from '../lib/api';
 import Modal from '../components/Modal';
 import Toggle from '../components/Toggle';
 
 export default function ClientList() {
   const { data: clients, error, isLoading, mutate } = useSWR('/clients', () => getClients().then(res => res.data));
   const { data: inbounds } = useSWR('/inbounds', () => getInbounds().then(res => res.data));
+  const { data: settings } = useSWR('/settings', () => getSettings().then(res => res.data));
   
   const [showModal, setShowModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -101,7 +102,9 @@ export default function ClientList() {
     const inbound = inbounds?.find((i: any) => i.id === client.inboundId);
     if (!inbound) return '';
 
-    const host = window.location.hostname;
+    // Use server_ip from settings, fall back to panel hostname
+    const host = (settings?.server_ip) || window.location.hostname;
+
     const port = inbound.port;
     const uuid = client.uuid;
     const tag = encodeURIComponent(client.email);
@@ -120,8 +123,9 @@ export default function ClientList() {
         const sni = stream.realitySettings?.serverNames?.[0] || '';
         const sid = stream.realitySettings?.shortIds?.[0] || '';
         const spx = stream.realitySettings?.spiderX || '/';
-        const fp = 'chrome';
-        const flow = client.flow || 'xtls-rprx-vision';
+        // Use fingerprint from inbound settings, fallback to chrome
+        const fp = stream.realitySettings?.fingerprint || 'chrome';
+        const flow = client.flow && client.flow !== 'none' ? client.flow : 'xtls-rprx-vision';
         url += `&pbk=${pbk}&sni=${sni}&fp=${fp}&sid=${sid}&spx=${encodeURIComponent(spx)}&flow=${flow}`;
       } else if (security === 'tls') {
         const sni = stream.tlsSettings?.serverName || host;
