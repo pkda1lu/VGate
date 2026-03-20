@@ -61,7 +61,25 @@ async function start() {
     const defaults = {
       xray_binary: process.platform === 'win32' ? 'xray.exe' : '/usr/local/bin/xray',
       xray_config_path: path.join(process.cwd(), 'xray_config.json'),
-      panel_port: '4000'
+      panel_port: '4000',
+      xray_config_log: JSON.stringify({ loglevel: "warning" }),
+      xray_config_dns: JSON.stringify({ servers: ["1.1.1.1", "8.8.8.8"] }),
+      xray_config_outbounds: JSON.stringify([
+        { protocol: "freedom", tag: "direct", settings: { domainStrategy: "AsIs" } },
+        { protocol: "blackhole", tag: "blocked" }
+      ]),
+      xray_config_routing: JSON.stringify({
+        domainStrategy: "AsIs",
+        rules: [
+          { type: "field", inboundTag: ["api"], outboundTag: "api" },
+          { type: "field", ip: ["geoip:private"], outboundTag: "blocked" },
+          { type: "field", protocol: ["bittorrent"], outboundTag: "blocked" }
+        ]
+      }),
+      xray_config_policy: JSON.stringify({
+        levels: { "0": { statsUserUplink: true, statsUserDownlink: true } },
+        system: { statsInboundUplink: true, statsInboundDownlink: true }
+      }),
     };
     for (const [key, value] of Object.entries(defaults)) {
       const existing = await settingsService.getSetting(key);

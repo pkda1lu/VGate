@@ -9,14 +9,23 @@ import {
   Database,
   Loader2,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  Network,
+  Share2,
+  Info,
+  Layers,
+  Zap
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { getSettings, updateSettings, restartXray } from '../lib/api';
 import useSWR from 'swr';
+import { motion, AnimatePresence } from 'framer-motion';
+
+type TabType = 'system' | 'general' | 'routing' | 'outbounds' | 'dns';
 
 export default function Settings() {
   const { data: settings, mutate, isLoading } = useSWR('/settings', () => getSettings().then(res => res.data));
+  const [activeTab, setActiveTab] = useState<TabType>('system');
   const [isSaving, setIsSaving] = useState(false);
   const [isRestarting, setIsRestarting] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
@@ -63,17 +72,45 @@ export default function Settings() {
     </div>
   );
 
+  const tabs: { id: TabType; label: string; icon: any }[] = [
+    { id: 'system', label: 'System', icon: <Cpu className="w-4 h-4" /> },
+    { id: 'general', label: 'General', icon: <Info className="w-4 h-4" /> },
+    { id: 'routing', label: 'Routing', icon: <Network className="w-4 h-4" /> },
+    { id: 'dns', label: 'DNS', icon: <Globe className="w-4 h-4" /> },
+    { id: 'outbounds', label: 'Outbounds', icon: <Share2 className="w-4 h-4" /> },
+  ];
+
   return (
-    <div className="space-y-8 animate-in slide-in-from-bottom duration-500 max-w-4xl mx-auto">
+    <div className="space-y-8 animate-in slide-in-from-bottom duration-500 max-w-6xl mx-auto pb-20">
       <header className="flex justify-between items-center">
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-3">
             <div className="p-2.5 rounded-2xl bg-primary/10 border border-primary/20 text-primary glow shadow-primary/5">
               <SettingsIcon className="w-6 h-6" />
             </div>
-            <h1 className="text-3xl font-bold tracking-tight">System Settings</h1>
+            <h1 className="text-3xl font-bold tracking-tight">Panel Settings</h1>
           </div>
-          <p className="text-muted-foreground mt-2">Configure your VGate panel and Xray core parameters</p>
+          <p className="text-muted-foreground mt-2">Manage panel behavior and Xray core configuration</p>
+        </div>
+        
+        <div className="flex gap-4">
+            <button
+                type="button"
+                onClick={handleRestart}
+                disabled={isRestarting}
+                className="bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl py-3 px-6 font-bold flex items-center gap-2 transition-all active:scale-[0.98] disabled:opacity-50"
+            >
+                {isRestarting ? <RefreshCw className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                Restart Core
+            </button>
+            <button
+                onClick={handleSave}
+                disabled={isSaving}
+                className="bg-primary hover:bg-primary/90 text-white px-8 py-3 rounded-2xl font-bold flex items-center gap-3 transition-all glow shadow-primary/20 active:scale-[0.98] disabled:opacity-70"
+            >
+                {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+                Save All
+            </button>
         </div>
       </header>
 
@@ -88,105 +125,180 @@ export default function Settings() {
         </div>
       )}
 
-      <form onSubmit={handleSave} className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Xray Configuration Section */}
-          <section className="glass p-8 rounded-[32px] border border-white/5 space-y-6 glow">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="p-2 rounded-xl bg-sky-500/10 text-sky-400 border border-sky-500/20">
-                <Cpu className="w-4 h-4" />
-              </div>
-              <h2 className="text-lg font-bold">Xray Core</h2>
-            </div>
-            
-            <SettingInput
-              label="Binary Path"
-              icon={<Terminal className="w-4 h-4" />}
-              value={formData.xray_binary || ''}
-              onChange={(v) => setFormData({ ...formData, xray_binary: v })}
-              placeholder="/usr/local/bin/xray"
-            />
-
-            <SettingInput
-              label="Config Path"
-              icon={<Database className="w-4 h-4" />}
-              value={formData.xray_config_path || ''}
-              onChange={(v) => setFormData({ ...formData, xray_config_path: v })}
-              placeholder="/etc/xray/config.json"
-            />
-          </section>
-
-          {/* Panel Configuration Section */}
-          <section className="glass p-8 rounded-[32px] border border-white/5 space-y-6 glow">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="p-2 rounded-xl bg-primary/10 text-primary border border-primary/20">
-                <Globe className="w-4 h-4" />
-              </div>
-              <h2 className="text-lg font-bold">Panel Interface</h2>
-            </div>
-            
-            <SettingInput
-              label="Panel Port"
-              type="number"
-              icon={<Shield className="w-4 h-4" />}
-              value={formData.panel_port || '4000'}
-              onChange={(v) => setFormData({ ...formData, panel_port: v })}
-              placeholder="4000"
-            />
-
-            <div className="pt-4">
-              <label className="text-xs font-black uppercase tracking-widest text-muted-foreground ml-1 mb-2 block">System Actions</label>
-              <button
-                type="button"
-                onClick={handleRestart}
-                disabled={isRestarting}
-                className="w-full bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl py-3 px-4 font-bold flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
-              >
-                {isRestarting ? <RefreshCw className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-                Restart Xray Core
-              </button>
-            </div>
-          </section>
-        </div>
-
-        {/* Telegram Integration (Premium feel) */}
-        <section className="glass p-8 rounded-[32px] border border-white/5 space-y-6 glow">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="p-2 rounded-xl bg-blue-500/10 text-blue-400 border border-blue-500/20">
-              <Globe className="w-4 h-4" />
-            </div>
-            <h2 className="text-lg font-bold">Telegram Integration</h2>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <SettingInput
-              label="Bot Token"
-              value={formData.telegram_token || ''}
-              onChange={(v) => setFormData({ ...formData, telegram_token: v })}
-              placeholder="123456789:ABCDE..."
-            />
-            <SettingInput
-              label="Chat ID"
-              value={formData.telegram_chat_id || ''}
-              onChange={(v) => setFormData({ ...formData, telegram_chat_id: v })}
-              placeholder="123456789"
-            />
-          </div>
-        </section>
-
-        <div className="flex justify-end pt-4">
+      {/* Tabs Navigation */}
+      <div className="flex gap-2 p-1 bg-white/[0.02] border border-white/5 rounded-2xl w-fit">
+        {tabs.map((tab) => (
           <button
-            type="submit"
-            disabled={isSaving}
-            className="bg-primary hover:bg-primary/90 text-white px-8 py-4 rounded-3xl font-bold flex items-center gap-3 transition-all glow shadow-primary/20 active:scale-[0.98] disabled:opacity-70"
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`
+              flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold transition-all
+              ${activeTab === tab.id 
+                ? 'bg-primary text-white shadow-lg shadow-primary/20' 
+                : 'text-muted-foreground hover:bg-white/5 hover:text-foreground'
+              }
+            `}
           >
-            {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
-            Save Configuration
+            {tab.icon}
+            {tab.label}
           </button>
-        </div>
-      </form>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 gap-8">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={activeTab}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.2 }}
+          >
+            {activeTab === 'system' && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <section className="glass p-8 rounded-[32px] border border-white/5 space-y-6 glow">
+                  <SectionTitle icon={<Layers className="w-4 h-4" />} title="Paths & Binaries" />
+                  <SettingInput
+                    label="Xray Binary"
+                    icon={<Terminal className="w-4 h-4" />}
+                    value={formData.xray_binary || ''}
+                    onChange={(v) => setFormData({ ...formData, xray_binary: v })}
+                    placeholder="/usr/local/bin/xray"
+                  />
+                  <SettingInput
+                    label="Config Path"
+                    icon={<Database className="w-4 h-4" />}
+                    value={formData.xray_config_path || ''}
+                    onChange={(v) => setFormData({ ...formData, xray_config_path: v })}
+                    placeholder="/etc/vgate/xray_config.json"
+                  />
+                  <SettingInput
+                    label="Panel Port"
+                    type="number"
+                    icon={<Shield className="w-4 h-4" />}
+                    value={formData.panel_port || '4000'}
+                    onChange={(v) => setFormData({ ...formData, panel_port: v })}
+                  />
+                </section>
+
+                <section className="glass p-8 rounded-[32px] border border-white/5 space-y-6 glow">
+                   <SectionTitle icon={<Zap className="w-4 h-4" />} title="Notifications" />
+                   <SettingInput
+                    label="Telegram Bot Token"
+                    value={formData.telegram_token || ''}
+                    onChange={(v) => setFormData({ ...formData, telegram_token: v })}
+                    placeholder="123456789:ABC..."
+                  />
+                  <SettingInput
+                    label="Telegram Chat ID"
+                    value={formData.telegram_chat_id || ''}
+                    onChange={(v) => setFormData({ ...formData, telegram_chat_id: v })}
+                    placeholder="123456789"
+                  />
+                </section>
+              </div>
+            )}
+
+            {activeTab === 'general' && (
+              <div className="space-y-6">
+                <section className="glass p-8 rounded-[32px] border border-white/5 space-y-6 glow">
+                  <SectionTitle icon={<Info className="w-4 h-4" />} title="Core Configuration" />
+                  <JsonEditor 
+                    label="Logging"
+                    value={formData.xray_config_log || ''}
+                    onChange={(v) => setFormData({ ...formData, xray_config_log: v })}
+                  />
+                  <JsonEditor 
+                    label="Policy (User Levels & Stats)"
+                    value={formData.xray_config_policy || ''}
+                    onChange={(v) => setFormData({ ...formData, xray_config_policy: v })}
+                  />
+                </section>
+              </div>
+            )}
+
+            {activeTab === 'routing' && (
+              <section className="glass p-8 rounded-[32px] border border-white/5 space-y-6 glow">
+                <SectionTitle icon={<Network className="w-4 h-4" />} title="Global Routing" />
+                <JsonEditor 
+                  label="Routing Rules & Strategy"
+                  value={formData.xray_config_routing || ''}
+                  onChange={(v) => setFormData({ ...formData, xray_config_routing: v })}
+                  height="h-[400px]"
+                />
+              </section>
+            )}
+
+            {activeTab === 'dns' && (
+              <section className="glass p-8 rounded-[32px] border border-white/5 space-y-6 glow">
+                <SectionTitle icon={<Globe className="w-4 h-4" />} title="DNS Settings" />
+                <JsonEditor 
+                  label="DNS Configuration"
+                  value={formData.xray_config_dns || ''}
+                  onChange={(v) => setFormData({ ...formData, xray_config_dns: v })}
+                />
+              </section>
+            )}
+
+            {activeTab === 'outbounds' && (
+              <section className="glass p-8 rounded-[32px] border border-white/5 space-y-6 glow">
+                <SectionTitle icon={<Share2 className="w-4 h-4" />} title="Outbound Detours" />
+                <JsonEditor 
+                  label="Outbounds List"
+                  value={formData.xray_config_outbounds || ''}
+                  onChange={(v) => setFormData({ ...formData, xray_config_outbounds: v })}
+                  height="h-[300px]"
+                />
+              </section>
+            )}
+          </motion.div>
+        </AnimatePresence>
+      </div>
     </div>
   );
+}
+
+function SectionTitle({ icon, title }: { icon: any, title: string }) {
+    return (
+        <div className="flex items-center gap-3 mb-2">
+            <div className="p-2 rounded-xl bg-primary/10 text-primary border border-primary/20">
+                {icon}
+            </div>
+            <h2 className="text-lg font-bold">{title}</h2>
+        </div>
+    );
+}
+
+function JsonEditor({ label, value, onChange, height = "h-[200px]" }: any) {
+    const [isValid, setIsValid] = useState(true);
+    
+    const handleChange = (val: string) => {
+        onChange(val);
+        try {
+            JSON.parse(val);
+            setIsValid(true);
+        } catch (e) {
+            setIsValid(false);
+        }
+    };
+
+    return (
+        <div className="space-y-2">
+            <div className="flex justify-between items-center">
+                <label className="text-xs font-black uppercase tracking-widest text-muted-foreground ml-1">{label}</label>
+                {!isValid && <span className="text-[10px] font-bold text-red-400 uppercase tracking-tighter">Invalid JSON</span>}
+            </div>
+            <textarea
+                value={value}
+                onChange={(e) => handleChange(e.target.value)}
+                className={`
+                    w-full bg-white/[0.02] border font-mono text-sm p-4 rounded-2xl focus:outline-none transition-all
+                    ${isValid ? 'border-white/5 focus:border-primary/40' : 'border-red-500/40 focus:border-red-500'}
+                    ${height}
+                `}
+            />
+        </div>
+    );
 }
 
 function SettingInput({ label, value, onChange, placeholder, type = "text", icon }: {

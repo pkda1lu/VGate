@@ -52,17 +52,24 @@ export class XrayService {
       };
     });
 
+    const settingsService = SettingsService.getInstance();
+    
+    // Load config sections from settings
+    const logSection = JSON.parse(await settingsService.getSetting('xray_config_log', '{"loglevel":"warning"}') as string);
+    const dnsSection = JSON.parse(await settingsService.getSetting('xray_config_dns', '{"servers":["1.1.1.1"]}') as string);
+    const outboundsSection = JSON.parse(await settingsService.getSetting('xray_config_outbounds', '[{"protocol":"freedom","tag":"direct"}]') as string);
+    const routingSection = JSON.parse(await settingsService.getSetting('xray_config_routing', '{"rules":[]}') as string);
+    const policySection = JSON.parse(await settingsService.getSetting('xray_config_policy', '{"levels":{"0":{"statsUserUplink":true,"statsUserDownlink":true}}}') as string);
+
     const config = {
-      log: { loglevel: "warning" },
-      stats: {}, // Enable stats
+      log: logSection,
+      stats: {}, 
+      dns: dnsSection,
       api: {
         tag: "api",
         services: ["HandlerService", "StatsService"]
       },
-      policy: {
-        levels: { "0": { statsUserUplink: true, statsUserDownlink: true } },
-        system: { statsInboundUplink: true, statsInboundDownlink: true }
-      },
+      policy: policySection,
       inbounds: [
         ...xrayInbounds,
         {
@@ -73,18 +80,10 @@ export class XrayService {
           tag: "api"
         }
       ],
-      outbounds: [
-        { protocol: "freedom", tag: "direct" },
-        { protocol: "blackhole", tag: "blocked" }
-      ],
-      routing: {
-        rules: [
-          { type: "field", inboundTag: ["api"], outboundTag: "api" }
-        ]
-      }
+      outbounds: outboundsSection,
+      routing: routingSection
     };
 
-    const settingsService = SettingsService.getInstance();
     const configPath = await settingsService.getSetting('xray_config_path', path.join(process.cwd(), 'xray_config.json'));
 
     await fs.writeJSON(configPath!, config, { spaces: 2 });
