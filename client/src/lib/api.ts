@@ -31,6 +31,7 @@ export const getInbounds = () => api.get('/inbounds');
 export const createInbound = (data: any) => api.post('/inbounds', data);
 export const updateInbound = (id: number, data: any) => api.put(`/inbounds/${id}`, data);
 export const deleteInbound = (id: number) => api.delete(`/inbounds/${id}`);
+export const getRealityKeys = () => api.get('/inbounds/generate-reality');
 
 export const getClients = () => api.get('/clients');
 export const createClient = (data: any) => api.post('/clients', data);

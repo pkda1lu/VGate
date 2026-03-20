@@ -59,6 +59,15 @@ export default async function inboundRoutes(fastify: FastifyInstance, options: F
     return inbound;
   });
 
+  fastify.get('/generate-reality', async () => {
+    const keys = generateRealityKeys();
+    return {
+      privateKey: keys.privateKey,
+      publicKey: keys.publicKey,
+      shortId: generateShortId()
+    };
+  });
+
   fastify.put('/:id', async (request, reply) => {
     const { id } = request.params as any;
     const body = request.body as any;

@@ -119,9 +119,10 @@ export default function ClientList() {
         const pbk = stream.realitySettings?.publicKey || '';
         const sni = stream.realitySettings?.serverNames?.[0] || '';
         const sid = stream.realitySettings?.shortIds?.[0] || '';
+        const spx = stream.realitySettings?.spiderX || '/';
         const fp = 'chrome';
         const flow = client.flow || 'xtls-rprx-vision';
-        url += `&pbk=${pbk}&sni=${sni}&fp=${fp}&sid=${sid}&spx=%2F&flow=${flow}`;
+        url += `&pbk=${pbk}&sni=${sni}&fp=${fp}&sid=${sid}&spx=${encodeURIComponent(spx)}&flow=${flow}`;
       } else if (security === 'tls') {
         const sni = stream.tlsSettings?.serverName || host;
         url += `&sni=${sni}`;

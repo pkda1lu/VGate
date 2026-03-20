@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import useSWR from 'swr';
 import { useState } from 'react';
-import { getInbounds, deleteInbound, createInbound, updateInbound } from '../lib/api';
+import { getInbounds, deleteInbound, createInbound, updateInbound, getRealityKeys } from '../lib/api';
 import Modal from '../components/Modal';
 import Toggle from '../components/Toggle';
 
@@ -38,6 +38,7 @@ export default function InboundList() {
     realityPrivateKey: '',
     realityPublicKey: '',
     realityShortIds: '',
+    realitySpiderX: '/',
 
     sniffingEnabled: true,
     sniffHttp: true,
@@ -61,6 +62,7 @@ export default function InboundList() {
       realityPrivateKey: '',
       realityPublicKey: '',
       realityShortIds: '',
+      realitySpiderX: '/',
       sniffingEnabled: true,
       sniffHttp: true,
       sniffTls: true,
@@ -93,6 +95,7 @@ export default function InboundList() {
       realityPrivateKey: rs.privateKey || '',
       realityPublicKey: rs.publicKey || '',
       realityShortIds: Array.isArray(rs.shortIds) ? rs.shortIds.join(', ') : '',
+      realitySpiderX: rs.spiderX || '/',
 
       sniffingEnabled: sniffEnv.enabled || false,
       sniffHttp: sniffEnv.destOverride?.includes('http') || false,
@@ -109,6 +112,20 @@ export default function InboundList() {
     if (confirm('Are you sure you want to delete this inbound?')) {
       await deleteInbound(id);
       mutate();
+    }
+  };
+
+  const handleGenerateKeys = async () => {
+    try {
+      const res = await getRealityKeys();
+      setFormData({
+        ...formData,
+        realityPrivateKey: res.data.privateKey,
+        realityPublicKey: res.data.publicKey,
+        realityShortIds: res.data.shortId,
+      });
+    } catch (e) {
+      console.error("Failed to generate keys");
     }
   };
 
@@ -140,7 +157,8 @@ export default function InboundList() {
           minClientVer: "",
           maxClientVer: "",
           maxTimeDiff: 0,
-          shortIds: formData.realityShortIds.split(',').map(s => s.trim()).filter(Boolean)
+          shortIds: formData.realityShortIds.split(',').map(s => s.trim()).filter(Boolean),
+          spiderX: formData.realitySpiderX,
         } : undefined
       },
       sniffing: {
@@ -403,10 +421,12 @@ export default function InboundList() {
                     </div>
 
                     <div className="space-y-1">
-                      <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex justify-between">
-                         Private Key 
-                         {!formData.realityPrivateKey && editingInbound && <span className="text-amber-500 lowercase normal-case">(Hidden - Auto config only)</span>}
-                      </label>
+                      <div className="flex items-center justify-between mb-1">
+                         <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                            Private Key
+                         </label>
+                         <button type="button" onClick={handleGenerateKeys} className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 px-2 py-1 rounded transition-colors uppercase tracking-widest">Сгенерировать X25519</button>
+                      </div>
                       <input
                         value={formData.realityPrivateKey}
                         onChange={(e) => setFormData({ ...formData, realityPrivateKey: e.target.value })}
@@ -433,6 +453,16 @@ export default function InboundList() {
                         value={formData.realityShortIds}
                         onChange={(e) => setFormData({ ...formData, realityShortIds: e.target.value })}
                         placeholder="Comma separated hex strings"
+                        className="w-full bg-white/[0.03] border border-white/5 rounded-xl h-11 px-4 focus:outline-none focus:border-[#38bdf8]/50 focus:bg-white/[0.05] transition-all text-sm font-mono block"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">SpiderX</label>
+                      <input
+                        value={formData.realitySpiderX}
+                        onChange={(e) => setFormData({ ...formData, realitySpiderX: e.target.value })}
+                        placeholder="e.g. /"
                         className="w-full bg-white/[0.03] border border-white/5 rounded-xl h-11 px-4 focus:outline-none focus:border-[#38bdf8]/50 focus:bg-white/[0.05] transition-all text-sm font-mono block"
                       />
                     </div>
