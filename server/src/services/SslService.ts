@@ -26,8 +26,6 @@ export class SslService {
             }
 
             // 2. Run certbot in standalone mode
-            // Note: This requires Port 80 to be free.
-            // If the user has Nginx, we should use --nginx, but standalone is more generic for raw VPS.
             const command = `certbot certonly --standalone --non-interactive --agree-tos -m ${email} -d ${domain}`;
             const { stdout, stderr } = await execAsync(command);
 
@@ -36,11 +34,20 @@ export class SslService {
             const keyPath = `/etc/letsencrypt/live/${domain}/privkey.pem`;
 
             if (await fs.pathExists(certPath) && await fs.pathExists(keyPath)) {
+                // Copy certs to a local panel-owned directory to avoid permission issues
+                const localCertDir = '/etc/vgate/certs';
+                await fs.ensureDir(localCertDir);
+                const localCert = path.join(localCertDir, `${domain}.fullchain.pem`);
+                const localKey = path.join(localCertDir, `${domain}.privkey.pem`);
+
+                await fs.copy(certPath, localCert);
+                await fs.copy(keyPath, localKey);
+
                 // Save to settings
                 const { SettingsService } = await import('./SettingsService');
                 const settingsService = SettingsService.getInstance();
-                await settingsService.updateSetting('ssl_cert', certPath);
-                await settingsService.updateSetting('ssl_key', keyPath);
+                await settingsService.updateSetting('ssl_cert', localCert);
+                await settingsService.updateSetting('ssl_key', localKey);
                 await settingsService.updateSetting('panel_domain', domain);
 
                 // Auto-restart after 2 seconds to apply SSL
@@ -49,7 +56,7 @@ export class SslService {
                     process.exit(0);
                 }, 2000);
 
-                return { success: true, log: log + "\n\n[DONE] SSL Certificates saved. The panel will RESTART AUTOMATICALLY in 2 seconds to apply HTTPS. Please refresh the page after a few moments." };
+                return { success: true, log: log + "\n\n[DONE] SSL Certificates saved and copied to /etc/vgate/certs. The panel will RESTART AUTOMATICALLY in 2 seconds to apply HTTPS. Please refresh the page after a few moments." };
             }
 
             return { success: false, log: "Certificates were not created. Full log:\n" + log };

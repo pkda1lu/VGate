@@ -26,10 +26,16 @@ async function start() {
     let httpsOptions: any = undefined;
 
     if (sslCert && sslKey && fs.existsSync(sslCert) && fs.existsSync(sslKey)) {
-        httpsOptions = {
-            cert: fs.readFileSync(sslCert),
-            key: fs.readFileSync(sslKey)
-        };
+        try {
+            httpsOptions = {
+                cert: fs.readFileSync(sslCert),
+                key: fs.readFileSync(sslKey)
+            };
+            console.log(`[SSL] Secure transport initialized from ${path.basename(sslCert)}`);
+        } catch (sslErr: any) {
+            console.error(`[SSL ERROR] Failed to read certificates: ${sslErr.message}`);
+            console.warn(`[SSL] Falling back to non-secure HTTP for panel access.`);
+        }
     }
 
     fastify = Fastify({
