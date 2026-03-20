@@ -34,12 +34,13 @@ export class XrayService {
         settings.clients = inbound.clients.map(client => ({
           id: client.uuid,
           email: client.email,
-          flow: client.flow || undefined,
+          flow: client.flow === 'none' || !client.flow ? undefined : client.flow,
         }));
       }
 
       if (inbound.protocol === 'vless') {
         settings.decryption = "none";
+        settings.fallbacks = [];
       }
 
       return {
@@ -80,6 +81,12 @@ export class XrayService {
     }
     if (blockAds) {
         routingSection.rules.push({ type: "field", domain: ["geosite:category-ads-all"], outboundTag: "blocked" });
+    }
+
+    // Ensure blackhole outbound exists if protection rules are active
+    const hasBlockedRules = blockBittorrent || blockPrivateIps || blockAds;
+    if (hasBlockedRules && !outboundsSection.find((o: any) => o.tag === 'blocked')) {
+        outboundsSection.push({ protocol: "blackhole", tag: "blocked" });
     }
 
     const config = {
