@@ -36,31 +36,45 @@ export class XrayService {
         return true;
       })
       .map(inbound => {
-      const settings = JSON.parse(inbound.settings);
+        let settings = { clients: [] as any[] };
+        try {
+           const dbSettings = JSON.parse(inbound.settings);
+           // We only need clients and specific fields, strip any trash
+           if (dbSettings.clients) settings.clients = dbSettings.clients;
+        } catch(e) {}
       
-      // Map clients from our DB into the settings expected by Xray
-      if (inbound.protocol === 'vless' || inbound.protocol === 'vmess' || inbound.protocol === 'trojan') {
+        // Map clients from our DB
         settings.clients = inbound.clients.map(client => ({
           id: client.uuid,
           email: client.email,
           flow: client.flow === 'none' || !client.flow ? undefined : client.flow,
         }));
-      }
 
-      if (inbound.protocol === 'vless') {
-        settings.decryption = "none";
-        settings.fallbacks = [];
-      }
+        if (inbound.protocol === 'vless') {
+          (settings as any).decryption = "none";
+          (settings as any).fallbacks = [];
+        }
 
-      return {
-        tag: inbound.tag,
-        port: inbound.port,
-        protocol: inbound.protocol,
-        settings: settings,
-        streamSettings: JSON.parse(inbound.stream),
-        sniffing: JSON.parse(inbound.sniffing)
-      };
-    });
+        const stream = JSON.parse(inbound.stream);
+        
+        // CRITICAL: Reality SERVER must NOT have publicKey in its config.
+        // It only needs privateKey. publicKey is for clients only.
+        if (stream.realitySettings) {
+          delete stream.realitySettings.publicKey;
+          if (Array.isArray(stream.realitySettings.shortIds)) {
+              stream.realitySettings.shortIds = stream.realitySettings.shortIds.filter((s: string) => s && s.trim().length > 0);
+          }
+        }
+
+        return {
+          tag: inbound.tag,
+          port: inbound.port,
+          protocol: inbound.protocol,
+          settings: settings,
+          streamSettings: stream,
+          sniffing: JSON.parse(inbound.sniffing)
+        };
+      });
 
     const settingsService = SettingsService.getInstance();
     
