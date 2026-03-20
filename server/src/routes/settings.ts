@@ -46,4 +46,21 @@ export default async function settingsRoutes(fastify: FastifyInstance) {
     const { XrayService } = await import('../services/XrayService');
     return XrayService.getInstance().getLogs();
   });
+
+  // DEBUG: Return generated Xray config + process status
+  fastify.get('/xray-config', async () => {
+    const { XrayService } = await import('../services/XrayService');
+    const { SettingsService: SS } = await import('../services/SettingsService');
+    const fs = await import('fs-extra');
+    const service = XrayService.getInstance();
+    const ss = SS.getInstance();
+    const configPath = await ss.getSetting('xray_config_path', require('path').join(process.cwd(), 'xray_config.json'));
+    let config = null;
+    try { config = await fs.readJSON(configPath!); } catch(e) { config = { error: 'Config file not found', path: configPath }; }
+    return {
+      isRunning: service.isRunning(),
+      configPath,
+      config
+    };
+  });
 }

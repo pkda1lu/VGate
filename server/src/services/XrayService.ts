@@ -165,6 +165,10 @@ export class XrayService {
     return this.logs;
   }
 
+  public isRunning(): boolean {
+    return this.process !== null;
+  }
+
   public stop() {
     if (this.process) {
       this.process.kill();
