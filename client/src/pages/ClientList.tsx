@@ -123,8 +123,7 @@ export default function ClientList() {
         const sni = stream.realitySettings?.serverNames?.[0] || '';
         const sid = stream.realitySettings?.shortIds?.[0] || '';
         const spx = stream.realitySettings?.spiderX || '/';
-        // Use fingerprint from inbound settings, fallback to chrome
-        const fp = stream.realitySettings?.fingerprint || 'chrome';
+        const fp = 'chrome'; // Chrome has widest client support (server fp is separate)
         const flow = client.flow && client.flow !== 'none' ? client.flow : 'xtls-rprx-vision';
         url += `&pbk=${pbk}&sni=${sni}&fp=${fp}&sid=${sid}&spx=${encodeURIComponent(spx)}&flow=${flow}`;
       } else if (security === 'tls') {

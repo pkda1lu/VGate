@@ -159,7 +159,9 @@ export class XrayService {
   private addLog(message: string) {
     const lines = message.split('\n').filter(l => l.trim());
     for (const line of lines) {
-        this.logs.push(`[${new Date().toLocaleTimeString()}] ${line}`);
+        const formatted = `[${new Date().toLocaleTimeString()}] ${line}`;
+        this.logs.push(formatted);
+        console.log(formatted); // Print to console for journalctl
     }
     if (this.logs.length > this.maxLogs) {
       this.logs = this.logs.slice(this.logs.length - this.maxLogs);
