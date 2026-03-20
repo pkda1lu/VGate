@@ -113,7 +113,7 @@ export default function ClientList() {
       const security = stream.security || 'none';
       const type = stream.network || 'tcp';
       
-      let url = `vless://${uuid}@${host}:${port}?type=${type}&security=${security}`;
+      let url = `vless://${uuid}@${host}:${port}?type=${type}&security=${security}&encryption=none`;
 
       if (security === 'reality') {
         const pbk = stream.realitySettings?.publicKey || '';
