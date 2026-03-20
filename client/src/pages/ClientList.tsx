@@ -26,6 +26,10 @@ export default function ClientList() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingClient, setEditingClient] = useState<any>(null);
 
+  // QR Modal State
+  const [qrModalOpen, setQrModalOpen] = useState(false);
+  const [qrLink, setQrLink] = useState('');
+
   const [formData, setFormData] = useState({
     inboundId: '',
     email: '',
@@ -91,6 +95,60 @@ export default function ClientList() {
   const getTrafficPercentage = (usage: number, limit: number) => {
     if (!limit || limit === 0) return 0;
     return Math.min((usage / limit) * 100, 100);
+  };
+
+  const generateShareLink = (client: any) => {
+    const inbound = inbounds?.find((i: any) => i.id === client.inboundId);
+    if (!inbound) return '';
+
+    const host = window.location.hostname;
+    const port = inbound.port;
+    const uuid = client.uuid;
+    const tag = encodeURIComponent(client.email);
+
+    if (inbound.protocol === 'vless') {
+      let stream;
+      try { stream = JSON.parse(inbound.stream); } catch(e) { stream = {}; }
+      
+      const security = stream.security || 'none';
+      const type = stream.network || 'tcp';
+      
+      let url = `vless://${uuid}@${host}:${port}?type=${type}&security=${security}`;
+
+      if (security === 'reality') {
+        const pbk = stream.realitySettings?.publicKey || '';
+        const sni = stream.realitySettings?.serverNames?.[0] || '';
+        const sid = stream.realitySettings?.shortIds?.[0] || '';
+        const fp = 'chrome';
+        const flow = client.flow || 'xtls-rprx-vision';
+        url += `&pbk=${pbk}&sni=${sni}&fp=${fp}&sid=${sid}&spx=%2F&flow=${flow}`;
+      } else if (security === 'tls') {
+        const sni = stream.tlsSettings?.serverName || host;
+        url += `&sni=${sni}`;
+      }
+
+      url += `#${tag}`;
+      return url;
+    }
+    
+    // Fallback for other protocols if needed
+    return `Unknown protocol: ${inbound.protocol}`;
+  };
+
+  const handleCopyLink = (client: any) => {
+    const link = generateShareLink(client);
+    if (link) {
+      navigator.clipboard.writeText(link);
+      alert('Link copied to clipboard!');
+    }
+  };
+
+  const handleShowQr = (client: any) => {
+    const link = generateShareLink(client);
+    if (link) {
+      setQrLink(link);
+      setQrModalOpen(true);
+    }
   };
 
   if (isLoading) return (
@@ -168,8 +226,8 @@ export default function ClientList() {
              </div>
 
              <div className="flex gap-2">
-                <IconBtn tooltip="Copy Node Link" icon={<Copy className="w-4 h-4" />} />
-                <IconBtn tooltip="Show QR Code" icon={<QrCode className="w-4 h-4" />} />
+                <IconBtn onClick={() => handleCopyLink(client)} tooltip="Copy Node Link" icon={<Copy className="w-4 h-4" />} />
+                <IconBtn onClick={() => handleShowQr(client)} tooltip="Show QR Code" icon={<QrCode className="w-4 h-4" />} />
                 <IconBtn onClick={() => openEditModal(client)} tooltip="Edit Client" icon={<Settings className="w-4 h-4" />} color="text-sky-400 hover:bg-sky-500/10" />
                 <IconBtn onClick={() => handleDelete(client.id)} tooltip="Delete User" icon={<Trash2 className="w-4 h-4" />} color="text-red-400 hover:bg-red-500/10" />
              </div>
@@ -302,6 +360,35 @@ export default function ClientList() {
              </button>
           </div>
         </form>
+      </Modal>
+
+      <Modal isOpen={qrModalOpen} onClose={() => setQrModalOpen(false)} title="Client QR Code" size="md">
+        <div className="flex flex-col items-center justify-center p-8 space-y-6">
+           <div className="bg-white p-4 rounded-2xl shadow-2xl">
+              <img 
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(qrLink)}`} 
+                alt="Client QR Code"
+                className="w-[200px] h-[200px]"
+              />
+           </div>
+           <div className="w-full">
+             <input 
+               type="text" 
+               readOnly 
+               value={qrLink} 
+               className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-xs font-mono text-muted-foreground focus:outline-none"
+             />
+           </div>
+           <button 
+             onClick={() => {
+               navigator.clipboard.writeText(qrLink);
+               setQrModalOpen(false);
+             }}
+             className="w-full bg-primary hover:bg-primary/90 text-white font-bold py-3 rounded-2xl transition-all"
+           >
+             Copy Link & Close
+           </button>
+        </div>
       </Modal>
     </div>
   );

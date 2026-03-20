@@ -37,6 +37,7 @@ export default async function inboundRoutes(fastify: FastifyInstance, options: F
           xver: 0,
           serverNames: ["google.com", "www.google.com"],
           privateKey: keys.privateKey,
+          publicKey: keys.publicKey,
           minClientVer: "",
           maxClientVer: "",
           maxTimeDiff: 0,

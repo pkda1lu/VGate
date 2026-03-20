@@ -30,7 +30,15 @@ export default function InboundList() {
     tag: '',
     port: 443,
     protocol: 'vless',
+    network: 'tcp',
     security: 'reality',
+
+    realityDest: 'google.com:443',
+    realityServerNames: 'google.com, www.google.com',
+    realityPrivateKey: '',
+    realityPublicKey: '',
+    realityShortIds: '',
+
     sniffingEnabled: true,
     sniffHttp: true,
     sniffTls: true,
@@ -46,7 +54,13 @@ export default function InboundList() {
       tag: '',
       port: 443,
       protocol: 'vless',
+      network: 'tcp',
       security: 'reality',
+      realityDest: 'google.com:443',
+      realityServerNames: 'google.com, www.google.com',
+      realityPrivateKey: '',
+      realityPublicKey: '',
+      realityShortIds: '',
       sniffingEnabled: true,
       sniffHttp: true,
       sniffTls: true,
@@ -61,13 +75,25 @@ export default function InboundList() {
   const openEditModal = (inb: any) => {
     setEditingInbound(inb);
     let sniffEnv;
+    let stream;
     try { sniffEnv = JSON.parse(inb.sniffing); } catch(e) { sniffEnv = { enabled: true, destOverride: ["http", "tls"] }; }
+    try { stream = JSON.parse(inb.stream); } catch(e) { stream = { network: 'tcp', security: 'none' }; }
+
+    const rs = stream.realitySettings || {};
 
     setFormData({
       tag: inb.tag,
       port: inb.port,
       protocol: inb.protocol,
-      security: 'reality', // stub
+      network: stream.network || 'tcp',
+      security: stream.security || 'none',
+
+      realityDest: rs.dest || 'google.com:443',
+      realityServerNames: Array.isArray(rs.serverNames) ? rs.serverNames.join(', ') : 'google.com',
+      realityPrivateKey: rs.privateKey || '',
+      realityPublicKey: rs.publicKey || '',
+      realityShortIds: Array.isArray(rs.shortIds) ? rs.shortIds.join(', ') : '',
+
       sniffingEnabled: sniffEnv.enabled || false,
       sniffHttp: sniffEnv.destOverride?.includes('http') || false,
       sniffTls: sniffEnv.destOverride?.includes('tls') || false,
@@ -101,6 +127,22 @@ export default function InboundList() {
       tag: formData.tag,
       port: formData.port,
       protocol: formData.protocol,
+      stream: {
+        network: formData.network,
+        security: formData.security,
+        realitySettings: formData.security === 'reality' ? {
+          show: false,
+          dest: formData.realityDest,
+          xver: 0,
+          serverNames: formData.realityServerNames.split(',').map(s => s.trim()).filter(Boolean),
+          privateKey: formData.realityPrivateKey,
+          publicKey: formData.realityPublicKey,
+          minClientVer: "",
+          maxClientVer: "",
+          maxTimeDiff: 0,
+          shortIds: formData.realityShortIds.split(',').map(s => s.trim()).filter(Boolean)
+        } : undefined
+      },
       sniffing: {
         enabled: formData.sniffingEnabled,
         destOverride,
@@ -228,107 +270,184 @@ export default function InboundList() {
         isOpen={showModal} 
         onClose={() => setShowModal(false)} 
         title={editingInbound ? "Редактировать подключение" : "Создать подключение"}
-        size="2xl"
+        size="4xl"
       >
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-6 max-h-[70vh] overflow-y-auto pr-4 custom-scrollbar">
           
-          <div className="grid grid-cols-[160px_1fr] items-center gap-4 group">
-             <label className="text-sm font-semibold text-right text-muted-foreground group-focus-within:text-foreground">Примечание (Tag)</label>
-             <input
-               required
-               value={formData.tag}
-               onChange={(e) => setFormData({ ...formData, tag: e.target.value })}
-               placeholder="e.g. vless-reality-main"
-               className="w-full bg-white/[0.03] border border-white/5 rounded-xl h-11 px-4 focus:outline-none focus:border-primary/50 focus:bg-white/[0.05] transition-all text-sm"
-             />
-          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {/* Left Column: Basic Settings */}
+            <div className="space-y-4">
+              <h3 className="text-sm font-black uppercase tracking-widest text-primary border-b border-primary/20 pb-2 mb-4">Основные</h3>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Примечание (Tag)</label>
+                <input
+                  required
+                  value={formData.tag}
+                  onChange={(e) => setFormData({ ...formData, tag: e.target.value })}
+                  placeholder="e.g. vless-reality-main"
+                  className="w-full bg-white/[0.03] border border-white/5 rounded-xl h-11 px-4 focus:outline-none focus:border-primary/50 focus:bg-white/[0.05] transition-all text-sm block"
+                />
+              </div>
 
-          <div className="grid grid-cols-[160px_1fr] items-center gap-4 group">
-             <label className="text-sm font-semibold text-right text-muted-foreground group-focus-within:text-foreground">Протокол</label>
-             <select
-               value={formData.protocol}
-               onChange={(e) => setFormData({ ...formData, protocol: e.target.value })}
-               className="w-full bg-white/[0.03] border border-white/5 rounded-xl h-11 px-4 focus:outline-none focus:border-primary/50 focus:bg-white/[0.05] transition-all text-sm appearance-none"
-             >
-               <option value="vless" className="bg-background">VLESS</option>
-               <option value="vmess" className="bg-background">VMess</option>
-               <option value="trojan" className="bg-background">Trojan</option>
-               <option value="shadowsocks" className="bg-background">Shadowsocks</option>
-             </select>
-          </div>
-
-          <div className="grid grid-cols-[160px_1fr] items-center gap-4 group">
-             <label className="text-sm font-semibold text-right text-muted-foreground group-focus-within:text-foreground">Порт</label>
-             <input
-               type="number"
-               required
-               value={formData.port}
-               onChange={(e) => setFormData({ ...formData, port: parseInt(e.target.value) })}
-               className="w-full bg-white/[0.03] border border-white/5 rounded-xl h-11 px-4 focus:outline-none focus:border-primary/50 focus:bg-white/[0.05] transition-all text-sm"
-             />
-          </div>
-
-          <div className="grid grid-cols-[160px_1fr] items-center gap-4 group pt-4 mt-4 border-t border-white/5">
-             <label className="text-sm font-semibold text-right text-muted-foreground group-focus-within:text-foreground">Безопасность</label>
-             <div className="flex bg-white/[0.03] border border-white/5 rounded-xl p-1 gap-1 h-11">
-                {['none', 'reality', 'tls'].map(sec => (
-                   <button 
-                     key={sec}
-                     type="button" 
-                     onClick={() => setFormData({...formData, security: sec})}
-                     className={`flex-1 rounded-lg text-sm font-bold transition-all capitalize ${
-                       formData.security === sec ? 'bg-primary text-white shadow-md shadow-primary/20' : 'text-muted-foreground hover:bg-white/5 hover:text-foreground'
-                     }`}
-                   >
-                     {sec === 'none' ? 'Пусто' : sec}
-                   </button>
-                ))}
-             </div>
-          </div>
-
-          {/* Sniffing Accordion */}
-          <div className="border border-white/5 bg-white/[0.01] rounded-2xl mt-6 overflow-hidden transition-all">
-            <button 
-              type="button" 
-              onClick={() => setSniffingOpen(!sniffingOpen)}
-              className="w-full p-4 flex items-center gap-3 border-b border-white/5 hover:bg-white/[0.02] transition-colors"
-            >
-               {sniffingOpen ? <ChevronDown className="w-5 h-5 text-muted-foreground" /> : <ChevronRight className="w-5 h-5 text-muted-foreground" />}
-               <span className="font-semibold text-sm">Sniffing</span>
-            </button>
-            
-            {sniffingOpen && (
-              <div className="p-6 space-y-6">
-                <div className="flex items-center gap-4">
-                   <Toggle 
-                     checked={formData.sniffingEnabled} 
-                     onChange={(v) => setFormData({...formData, sniffingEnabled: v})} 
-                     label="Включено (Enabled)" 
-                   />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Протокол</label>
+                  <select
+                    value={formData.protocol}
+                    onChange={(e) => setFormData({ ...formData, protocol: e.target.value })}
+                    className="w-full bg-white/[0.03] border border-white/5 rounded-xl h-11 px-4 focus:outline-none focus:border-primary/50 focus:bg-white/[0.05] transition-all text-sm appearance-none block"
+                  >
+                    <option value="vless" className="bg-background">VLESS</option>
+                    <option value="vmess" className="bg-background">VMess</option>
+                    <option value="trojan" className="bg-background">Trojan</option>
+                  </select>
                 </div>
-                
-                <div className="flex flex-wrap gap-4 items-center pl-14">
-                   <Checkbox label="HTTP" checked={formData.sniffHttp} onChange={(v) => setFormData({...formData, sniffHttp: v})} />
-                   <Checkbox label="TLS" checked={formData.sniffTls} onChange={(v) => setFormData({...formData, sniffTls: v})} />
-                   <Checkbox label="QUIC" checked={formData.sniffQuic} onChange={(v) => setFormData({...formData, sniffQuic: v})} />
-                   <Checkbox label="FAKEDNS" checked={formData.sniffFakedns} onChange={(v) => setFormData({...formData, sniffFakedns: v})} />
-                </div>
-                {/* Advanced toggles */}
-                <div className="space-y-4 pt-4 border-t border-white/5">
-                   <div className="flex items-center justify-between">
-                     <span className="text-sm font-semibold text-muted-foreground px-4">Metadata Only</span>
-                     <Toggle checked={formData.metadataOnly} onChange={(v) => setFormData({...formData, metadataOnly: v})} />
-                   </div>
-                   <div className="flex items-center justify-between">
-                     <span className="text-sm font-semibold text-muted-foreground px-4">Route Only</span>
-                     <Toggle checked={formData.routeOnly} onChange={(v) => setFormData({...formData, routeOnly: v})} />
-                   </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Порт</label>
+                  <input
+                    type="number"
+                    required
+                    value={formData.port}
+                    onChange={(e) => setFormData({ ...formData, port: parseInt(e.target.value) })}
+                    className="w-full bg-white/[0.03] border border-white/5 rounded-xl h-11 px-4 focus:outline-none focus:border-primary/50 focus:bg-white/[0.05] transition-all text-sm block"
+                  />
                 </div>
               </div>
-            )}
+
+              <div className="grid grid-cols-2 gap-4 pt-2">
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Сеть (Network)</label>
+                  <select
+                    value={formData.network}
+                    onChange={(e) => setFormData({ ...formData, network: e.target.value })}
+                    className="w-full bg-white/[0.03] border border-white/5 rounded-xl h-11 px-4 focus:outline-none focus:border-primary/50 focus:bg-white/[0.05] transition-all text-sm appearance-none block"
+                  >
+                    <option value="tcp" className="bg-background">TCP</option>
+                    <option value="ws" className="bg-background">WebSocket (ws)</option>
+                    <option value="grpc" className="bg-background">gRPC</option>
+                    <option value="httpupgrade" className="bg-background">HTTPUpgrade</option>
+                  </select>
+                </div>
+                
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Шифрование</label>
+                  <select
+                    value={formData.security}
+                    onChange={(e) => setFormData({ ...formData, security: e.target.value })}
+                    className="w-full bg-white/[0.03] border border-white/5 rounded-xl h-11 px-4 focus:outline-none focus:border-primary/50 focus:bg-white/[0.05] transition-all text-sm appearance-none block"
+                  >
+                    <option value="none" className="bg-background">Пусто (None)</option>
+                    <option value="tls" className="bg-background">TLS</option>
+                    <option value="reality" className="bg-background">Reality</option>
+                  </select>
+                </div>
+              </div>
+              
+              <div className="border border-white/5 bg-white/[0.01] rounded-2xl mt-4 overflow-hidden transition-all">
+                <button 
+                  type="button" 
+                  onClick={() => setSniffingOpen(!sniffingOpen)}
+                  className="w-full p-4 flex items-center gap-3 border-b border-white/5 hover:bg-white/[0.02] transition-colors"
+                >
+                  {sniffingOpen ? <ChevronDown className="w-5 h-5 text-muted-foreground" /> : <ChevronRight className="w-5 h-5 text-muted-foreground" />}
+                  <span className="font-semibold text-sm">Настройки Sniffing</span>
+                </button>
+                {sniffingOpen && (
+                  <div className="p-4 space-y-4">
+                    <Toggle checked={formData.sniffingEnabled} onChange={(v) => setFormData({...formData, sniffingEnabled: v})} label="Включить Sniffing" />
+                    <div className="flex flex-wrap gap-4 items-center">
+                      <Checkbox label="HTTP" checked={formData.sniffHttp} onChange={(v) => setFormData({...formData, sniffHttp: v})} />
+                      <Checkbox label="TLS" checked={formData.sniffTls} onChange={(v) => setFormData({...formData, sniffTls: v})} />
+                      <Checkbox label="QUIC" checked={formData.sniffQuic} onChange={(v) => setFormData({...formData, sniffQuic: v})} />
+                      <Checkbox label="FAKEDNS" checked={formData.sniffFakedns} onChange={(v) => setFormData({...formData, sniffFakedns: v})} />
+                    </div>
+                    <div className="flex gap-4 pt-2 border-t border-white/5">
+                      <Toggle checked={formData.metadataOnly} onChange={(v) => setFormData({...formData, metadataOnly: v})} label="Metadata Only" />
+                      <Toggle checked={formData.routeOnly} onChange={(v) => setFormData({...formData, routeOnly: v})} label="Route Only" />
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Right Column: Advanced Reality or TLS */}
+            <div className="space-y-4 bg-white/[0.02] p-6 rounded-3xl border border-white/5 relative">
+               <h3 className="text-sm font-black uppercase tracking-widest text-[#38bdf8] border-b border-[#38bdf8]/20 pb-2 mb-4">Security: {formData.security}</h3>
+               
+               {formData.security === 'none' && (
+                  <div className="flex items-center justify-center p-8 opacity-50">
+                     <p className="text-sm font-semibold text-center italic">No additional security layers required for this configuration.</p>
+                  </div>
+               )}
+
+               {formData.security === 'reality' && (
+                 <div className="space-y-4 animate-in fade-in">
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Dest (Реальный хост)</label>
+                      <input
+                        value={formData.realityDest}
+                        onChange={(e) => setFormData({ ...formData, realityDest: e.target.value })}
+                        placeholder="e.g. google.com:443"
+                        className="w-full bg-white/[0.03] border border-white/5 rounded-xl h-11 px-4 focus:outline-none focus:border-[#38bdf8]/50 focus:bg-white/[0.05] transition-all text-sm block"
+                      />
+                    </div>
+                    
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">SNI (Server Names)</label>
+                      <input
+                        value={formData.realityServerNames}
+                        onChange={(e) => setFormData({ ...formData, realityServerNames: e.target.value })}
+                        placeholder="google.com, www.google.com"
+                        className="w-full bg-white/[0.03] border border-white/5 rounded-xl h-11 px-4 focus:outline-none focus:border-[#38bdf8]/50 focus:bg-white/[0.05] transition-all text-sm block"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex justify-between">
+                         Private Key 
+                         {!formData.realityPrivateKey && editingInbound && <span className="text-amber-500 lowercase normal-case">(Hidden - Auto config only)</span>}
+                      </label>
+                      <input
+                        value={formData.realityPrivateKey}
+                        onChange={(e) => setFormData({ ...formData, realityPrivateKey: e.target.value })}
+                        placeholder="Paste auto-generated key or leave empty"
+                        className="w-full bg-white/[0.03] border border-white/5 rounded-xl h-11 px-4 focus:outline-none focus:border-[#38bdf8]/50 focus:bg-white/[0.05] transition-all text-sm font-mono block opacity-80"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex justify-between">
+                         Public Key
+                      </label>
+                      <input
+                        value={formData.realityPublicKey}
+                        onChange={(e) => setFormData({ ...formData, realityPublicKey: e.target.value })}
+                        placeholder="Paste public key or leave empty"
+                        className="w-full bg-white/[0.03] border border-white/5 rounded-xl h-11 px-4 focus:outline-none focus:border-[#38bdf8]/50 focus:bg-white/[0.05] transition-all text-sm font-mono block opacity-80"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Short IDs</label>
+                      <input
+                        value={formData.realityShortIds}
+                        onChange={(e) => setFormData({ ...formData, realityShortIds: e.target.value })}
+                        placeholder="Comma separated hex strings"
+                        className="w-full bg-white/[0.03] border border-white/5 rounded-xl h-11 px-4 focus:outline-none focus:border-[#38bdf8]/50 focus:bg-white/[0.05] transition-all text-sm font-mono block"
+                      />
+                    </div>
+                 </div>
+               )}
+
+               {formData.security === 'tls' && (
+                 <div className="space-y-4 animate-in fade-in">
+                    <p className="text-sm font-medium text-muted-foreground">TLS Certificates and ACME paths will be managed globally. Specific inbound SNIs can be placed here over time.</p>
+                 </div>
+               )}
+            </div>
           </div>
 
-          <div className="pt-8 flex gap-3 justify-end items-center border-t border-white/5 mt-8">
+          <div className="pt-4 flex gap-3 justify-end items-center border-t border-white/5 mt-8 relative z-10 bg-background/80 backdrop-blur-md sticky bottom-0">
              <button
                type="button"
                onClick={() => setShowModal(false)}
