@@ -24,7 +24,9 @@ export default function InboundList() {
   const [editingInbound, setEditingInbound] = useState<any>(null);
   
   // UI states
-  const [sniffingOpen, setSniffingOpen] = useState(true);
+  const [sniffingOpen, setSniffingOpen] = useState(false);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [advancedStreamOpen, setAdvancedStreamOpen] = useState(false);
 
   const [formData, setFormData] = useState({
     tag: '',
@@ -39,6 +41,19 @@ export default function InboundList() {
     realityPublicKey: '',
     realityShortIds: '',
     realitySpiderX: '/',
+    
+    // Advanced Reality
+    realityShow: false,
+    realityXver: 0,
+    realityMaxTimeDiff: 0,
+    realityMinClientVer: '',
+    realityMaxClientVer: '',
+    realityFingerprint: 'chrome',
+    
+    // Advanced Transport
+    acceptProxyProtocol: false,
+    httpMasking: false,
+    tcpSockopt: false,
 
     sniffingEnabled: true,
     sniffHttp: true,
@@ -63,6 +78,15 @@ export default function InboundList() {
       realityPublicKey: '',
       realityShortIds: '',
       realitySpiderX: '/',
+      realityShow: false,
+      realityXver: 0,
+      realityMaxTimeDiff: 0,
+      realityMinClientVer: '',
+      realityMaxClientVer: '',
+      realityFingerprint: 'chrome',
+      acceptProxyProtocol: false,
+      httpMasking: false,
+      tcpSockopt: false,
       sniffingEnabled: true,
       sniffHttp: true,
       sniffTls: true,
@@ -82,6 +106,8 @@ export default function InboundList() {
     try { stream = JSON.parse(inb.stream); } catch(e) { stream = { network: 'tcp', security: 'none' }; }
 
     const rs = stream.realitySettings || {};
+    const tcp = stream.tcpSettings || {};
+    const sockopt = stream.sockopt || {};
 
     setFormData({
       tag: inb.tag,
@@ -96,6 +122,17 @@ export default function InboundList() {
       realityPublicKey: rs.publicKey || '',
       realityShortIds: Array.isArray(rs.shortIds) ? rs.shortIds.join(', ') : '',
       realitySpiderX: rs.spiderX || '/',
+
+      realityShow: rs.show || false,
+      realityXver: rs.xver || 0,
+      realityMaxTimeDiff: rs.maxTimeDiff || 0,
+      realityMinClientVer: rs.minClientVer || '',
+      realityMaxClientVer: rs.maxClientVer || '',
+      realityFingerprint: rs.fingerprint || 'chrome',
+
+      acceptProxyProtocol: stream.network === 'tcp' && tcp.acceptProxyProtocol === true,
+      httpMasking: stream.network === 'tcp' && tcp.header?.type === 'http',
+      tcpSockopt: Object.keys(sockopt).length > 0,
 
       sniffingEnabled: sniffEnv.enabled || false,
       sniffHttp: sniffEnv.destOverride?.includes('http') || false,
@@ -147,18 +184,38 @@ export default function InboundList() {
       stream: {
         network: formData.network,
         security: formData.security,
+        
+        ...(formData.network === 'tcp' ? {
+          tcpSettings: {
+            acceptProxyProtocol: formData.acceptProxyProtocol,
+            header: formData.httpMasking ? {
+              type: "http",
+              request: { version: "1.1", method: "GET", path: ["/"], headers: { Host: ["www.bing.com"] } },
+              response: { version: "1.1", status: "200", reason: "OK", headers: { "Content-Type": ["application/octet-stream"] } }
+            } : { type: "none" }
+          }
+        } : {}),
+
+        ...(formData.tcpSockopt ? {
+          sockopt: {
+            tcpFastOpen: true,
+            tproxy: "passive"
+          }
+        } : {}),
+
         realitySettings: formData.security === 'reality' ? {
-          show: false,
+          show: formData.realityShow,
           dest: formData.realityDest,
-          xver: 0,
+          xver: formData.realityXver,
           serverNames: formData.realityServerNames.split(',').map(s => s.trim()).filter(Boolean),
           privateKey: formData.realityPrivateKey,
           publicKey: formData.realityPublicKey,
-          minClientVer: "",
-          maxClientVer: "",
-          maxTimeDiff: 0,
+          minClientVer: formData.realityMinClientVer,
+          maxClientVer: formData.realityMaxClientVer,
+          maxTimeDiff: formData.realityMaxTimeDiff,
           shortIds: formData.realityShortIds.split(',').map(s => s.trim()).filter(Boolean),
           spiderX: formData.realitySpiderX,
+          fingerprint: formData.realityFingerprint
         } : undefined
       },
       sniffing: {
@@ -386,6 +443,38 @@ export default function InboundList() {
                   </div>
                 )}
               </div>
+
+              {/* Advanced Transport Settings Accordion */}
+              <div className="border border-white/5 bg-white/[0.01] rounded-2xl mt-4 overflow-hidden transition-all">
+                <button 
+                  type="button" 
+                  onClick={() => setAdvancedStreamOpen(!advancedStreamOpen)}
+                  className="w-full p-4 flex items-center gap-3 border-b border-white/5 hover:bg-white/[0.02] transition-colors"
+                >
+                  {advancedStreamOpen ? <ChevronDown className="w-5 h-5 text-muted-foreground" /> : <ChevronRight className="w-5 h-5 text-muted-foreground" />}
+                  <span className="font-semibold text-sm">Доп. настройки Транспорта</span>
+                </button>
+                {advancedStreamOpen && (
+                  <div className="p-4 space-y-4">
+                    <Toggle 
+                      checked={formData.acceptProxyProtocol} 
+                      onChange={(v) => setFormData({...formData, acceptProxyProtocol: v})} 
+                      label="Proxy Protocol" 
+                    />
+                    <Toggle 
+                      checked={formData.httpMasking} 
+                      onChange={(v) => setFormData({...formData, httpMasking: v})} 
+                      label="HTTP Маскировка" 
+                      disabled={formData.network !== 'tcp'}
+                    />
+                    <Toggle 
+                      checked={formData.tcpSockopt} 
+                      onChange={(v) => setFormData({...formData, tcpSockopt: v})} 
+                      label="Sockopt (TProxy, TFO)" 
+                    />
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Right Column: Advanced Reality or TLS */}
@@ -465,6 +554,59 @@ export default function InboundList() {
                         placeholder="e.g. /"
                         className="w-full bg-white/[0.03] border border-white/5 rounded-xl h-11 px-4 focus:outline-none focus:border-[#38bdf8]/50 focus:bg-white/[0.05] transition-all text-sm font-mono block"
                       />
+                    </div>
+
+                    <div className="pt-4 mt-2 border-t border-white/5">
+                      <button 
+                        type="button" 
+                        onClick={() => setAdvancedOpen(!advancedOpen)}
+                        className="flex items-center gap-2 text-xs font-bold text-muted-foreground uppercase tracking-widest hover:text-white transition-colors py-2"
+                      >
+                        {advancedOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                        Тонкие настройки Reality
+                      </button>
+                      
+                      {advancedOpen && (
+                        <div className="space-y-4 mt-4 pl-6 border-l-2 border-white/5 pb-2 animate-in fade-in">
+                          <Toggle checked={formData.realityShow} onChange={(v) => setFormData({...formData, realityShow: v})} label="Show (Дебаг)" />
+                          
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-1">
+                              <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Xver</label>
+                              <input type="number" value={formData.realityXver} onChange={(e) => setFormData({...formData, realityXver: parseInt(e.target.value) || 0})} className="w-full bg-white/[0.03] border border-white/5 rounded-xl h-9 px-3 focus:outline-none focus:border-[#38bdf8]/50 text-xs" />
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Time Diff (ms)</label>
+                              <input type="number" value={formData.realityMaxTimeDiff} onChange={(e) => setFormData({...formData, realityMaxTimeDiff: parseInt(e.target.value) || 0})} className="w-full bg-white/[0.03] border border-white/5 rounded-xl h-9 px-3 focus:outline-none focus:border-[#38bdf8]/50 text-xs" />
+                            </div>
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">uTLS (Fingerprint)</label>
+                            <select value={formData.realityFingerprint} onChange={(e) => setFormData({...formData, realityFingerprint: e.target.value})} className="w-full bg-white/[0.03] border border-white/5 rounded-xl h-9 px-3 focus:outline-none focus:border-[#38bdf8]/50 appearance-none text-xs">
+                              <option value="chrome" className="bg-background">Chrome</option>
+                              <option value="firefox" className="bg-background">Firefox</option>
+                              <option value="safari" className="bg-background">Safari</option>
+                              <option value="ios" className="bg-background">iOS</option>
+                              <option value="android" className="bg-background">Android</option>
+                              <option value="edge" className="bg-background">Edge</option>
+                              <option value="qq" className="bg-background">QQ</option>
+                              <option value="randomized" className="bg-background">Randomized</option>
+                            </select>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-1">
+                              <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Min / Max Client Ver</label>
+                              <div className="flex gap-2">
+                                <input placeholder="Min" value={formData.realityMinClientVer} onChange={(e) => setFormData({...formData, realityMinClientVer: e.target.value})} className="w-full bg-white/[0.03] border border-white/5 rounded-xl h-9 px-3 focus:outline-none focus:border-[#38bdf8]/50 text-xs text-center" />
+                                <input placeholder="Max" value={formData.realityMaxClientVer} onChange={(e) => setFormData({...formData, realityMaxClientVer: e.target.value})} className="w-full bg-white/[0.03] border border-white/5 rounded-xl h-9 px-3 focus:outline-none focus:border-[#38bdf8]/50 text-xs text-center" />
+                              </div>
+                            </div>
+                          </div>
+
+                        </div>
+                      )}
                     </div>
                  </div>
                )}
