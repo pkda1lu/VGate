@@ -75,8 +75,7 @@ export class XrayService {
       ],
       outbounds: [
         { protocol: "freedom", tag: "direct" },
-        { protocol: "blackhole", tag: "blocked" },
-        { protocol: "api", tag: "api" }
+        { protocol: "blackhole", tag: "blocked" }
       ],
       routing: {
         rules: [
