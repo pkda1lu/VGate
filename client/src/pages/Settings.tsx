@@ -206,12 +206,12 @@ export default function Settings() {
                   <JsonEditor 
                     label="Logging"
                     value={formData.xray_config_log || ''}
-                    onChange={(v) => setFormData({ ...formData, xray_config_log: v })}
+                    onChange={(v: string) => setFormData({ ...formData, xray_config_log: v })}
                   />
                   <JsonEditor 
                     label="Policy (User Levels & Stats)"
                     value={formData.xray_config_policy || ''}
-                    onChange={(v) => setFormData({ ...formData, xray_config_policy: v })}
+                    onChange={(v: string) => setFormData({ ...formData, xray_config_policy: v })}
                   />
                 </section>
               </div>
@@ -223,7 +223,7 @@ export default function Settings() {
                 <JsonEditor 
                   label="Routing Rules & Strategy"
                   value={formData.xray_config_routing || ''}
-                  onChange={(v) => setFormData({ ...formData, xray_config_routing: v })}
+                  onChange={(v: string) => setFormData({ ...formData, xray_config_routing: v })}
                   height="h-[400px]"
                 />
               </section>
@@ -235,7 +235,7 @@ export default function Settings() {
                 <JsonEditor 
                   label="DNS Configuration"
                   value={formData.xray_config_dns || ''}
-                  onChange={(v) => setFormData({ ...formData, xray_config_dns: v })}
+                  onChange={(v: string) => setFormData({ ...formData, xray_config_dns: v })}
                 />
               </section>
             )}
@@ -246,7 +246,7 @@ export default function Settings() {
                 <JsonEditor 
                   label="Outbounds List"
                   value={formData.xray_config_outbounds || ''}
-                  onChange={(v) => setFormData({ ...formData, xray_config_outbounds: v })}
+                  onChange={(v: string) => setFormData({ ...formData, xray_config_outbounds: v })}
                   height="h-[300px]"
                 />
               </section>
