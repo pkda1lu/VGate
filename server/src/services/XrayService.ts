@@ -38,6 +38,10 @@ export class XrayService {
         }));
       }
 
+      if (inbound.protocol === 'vless') {
+        settings.decryption = "none";
+      }
+
       return {
         tag: inbound.tag,
         port: inbound.port,
