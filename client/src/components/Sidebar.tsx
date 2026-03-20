@@ -1,4 +1,4 @@
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, 
   Settings, 
@@ -6,7 +6,8 @@ import {
   Zap, 
   Activity, 
   Globe, 
-  Shield 
+  Shield,
+  LogOut
 } from 'lucide-react';
 
 const navItems = [
@@ -18,8 +19,15 @@ const navItems = [
 ];
 
 export default function Sidebar() {
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    localStorage.removeItem('vgate_token');
+    navigate('/login');
+  };
+
   return (
-    <aside className="w-72 bg-background border-r border-white/5 flex flex-col h-full sticky left-0 top-0 overflow-y-auto">
+    <aside className="w-72 bg-stripes-background border-r border-white/5 flex flex-col h-full sticky left-0 top-0 overflow-y-auto">
       <div className="p-8 flex items-center gap-3">
         <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center glow shadow-primary/40 rotate-12 group hover:rotate-0 transition-transform duration-500">
            <Zap className="text-white w-6 h-6" />
@@ -35,7 +43,7 @@ export default function Sidebar() {
           <NavLink
             key={item.path}
             to={item.path}
-            className={({ isActive }) => `
+            className={({ isActive }: { isActive: boolean }) => `
               flex items-center gap-4 px-4 py-3.5 rounded-2xl text-sm font-semibold transition-all group
               ${isActive 
                 ? 'bg-primary/10 text-primary border border-primary/20 glow shadow-primary/5' 
@@ -49,6 +57,16 @@ export default function Sidebar() {
             {item.label}
           </NavLink>
         ))}
+        
+        <button
+            onClick={handleLogout}
+            className="w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl text-sm font-semibold text-muted-foreground hover:bg-red-500/10 hover:text-red-500 border border-transparent transition-all group"
+        >
+            <span className="group-hover:scale-110 transition-transform duration-300">
+                <LogOut className="w-5 h-5" />
+            </span>
+            Sign Out
+        </button>
       </nav>
 
       <div className="p-4 mt-auto border-t border-white/5 bg-white/[0.01]">

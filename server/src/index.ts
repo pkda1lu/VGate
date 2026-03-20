@@ -10,6 +10,7 @@ import inboundRoutes from './routes/inbound';
 import clientRoutes from './routes/client';
 import settingsRoutes from './routes/settings';
 import systemRoutes from './routes/system';
+import authRoutes from './routes/auth';
 
 const fastify = Fastify({
   logger: {
@@ -42,6 +43,17 @@ async function start() {
     await fastify.register(clientRoutes, { prefix: '/api/clients' });
     await fastify.register(settingsRoutes, { prefix: '/api/settings' });
     await fastify.register(systemRoutes, { prefix: '/api/system' });
+    await fastify.register(authRoutes, { prefix: '/api/auth' });
+
+    // Auth Middleware
+    fastify.addHook('onRequest', async (request, reply) => {
+        if (request.url.startsWith('/api') && !request.url.startsWith('/api/auth') && request.url !== '/health') {
+            const token = request.headers.authorization?.replace('Bearer ', '');
+            if (!token) {
+                return reply.code(401).send({ error: 'Unauthorized' });
+            }
+        }
+    });
 
     fastify.get('/health', async () => {
       return { status: 'ok', time: new Date() };
