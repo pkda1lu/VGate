@@ -14,14 +14,16 @@ import {
   Share2,
   Info,
   Layers,
-  Zap
+  Zap,
+  ChevronDown,
+  Hash
 } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { getSettings, updateSettings, restartXray } from '../lib/api';
 import useSWR from 'swr';
 import { motion, AnimatePresence } from 'framer-motion';
 
-type TabType = 'system' | 'general' | 'routing' | 'outbounds' | 'dns';
+type TabType = 'system' | 'general' | 'routing' | 'dns' | 'outbounds';
 
 export default function Settings() {
   const { data: settings, mutate, isLoading } = useSWR('/settings', () => getSettings().then(res => res.data));
@@ -37,8 +39,8 @@ export default function Settings() {
     }
   }, [settings]);
 
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSave = async (e?: React.FormEvent) => {
+    e?.preventDefault();
     setIsSaving(true);
     setMessage(null);
     try {
@@ -68,7 +70,7 @@ export default function Settings() {
   if (isLoading) return (
     <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
       <Loader2 className="w-10 h-10 text-primary animate-spin" />
-      <p className="text-muted-foreground font-medium animate-pulse">Loading system configuration...</p>
+      <p className="text-muted-foreground font-medium animate-pulse">Loading core configuration...</p>
     </div>
   );
 
@@ -88,9 +90,9 @@ export default function Settings() {
             <div className="p-2.5 rounded-2xl bg-primary/10 border border-primary/20 text-primary glow shadow-primary/5">
               <SettingsIcon className="w-6 h-6" />
             </div>
-            <h1 className="text-3xl font-bold tracking-tight">Panel Settings</h1>
+            <h1 className="text-3xl font-bold tracking-tight">Configuration</h1>
           </div>
-          <p className="text-muted-foreground mt-2">Manage panel behavior and Xray core configuration</p>
+          <p className="text-muted-foreground mt-2">Fine-tune your server and Xray core settings</p>
         </div>
         
         <div className="flex gap-4">
@@ -104,12 +106,12 @@ export default function Settings() {
                 Restart Core
             </button>
             <button
-                onClick={handleSave}
+                onClick={() => handleSave()}
                 disabled={isSaving}
                 className="bg-primary hover:bg-primary/90 text-white px-8 py-3 rounded-2xl font-bold flex items-center gap-3 transition-all glow shadow-primary/20 active:scale-[0.98] disabled:opacity-70"
             >
                 {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
-                Save All
+                Save Changes
             </button>
         </div>
       </header>
@@ -155,73 +157,17 @@ export default function Settings() {
             transition={{ duration: 0.2 }}
           >
             {activeTab === 'system' && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <section className="glass p-8 rounded-[32px] border border-white/5 space-y-6 glow">
-                  <SectionTitle icon={<Layers className="w-4 h-4" />} title="Paths & Binaries" />
-                  <SettingInput
-                    label="Xray Binary"
-                    icon={<Terminal className="w-4 h-4" />}
-                    value={formData.xray_binary || ''}
-                    onChange={(v) => setFormData({ ...formData, xray_binary: v })}
-                    placeholder="/usr/local/bin/xray"
-                  />
-                  <SettingInput
-                    label="Config Path"
-                    icon={<Database className="w-4 h-4" />}
-                    value={formData.xray_config_path || ''}
-                    onChange={(v) => setFormData({ ...formData, xray_config_path: v })}
-                    placeholder="/etc/vgate/xray_config.json"
-                  />
-                  <SettingInput
-                    label="Panel Port"
-                    type="number"
-                    icon={<Shield className="w-4 h-4" />}
-                    value={formData.panel_port || '4000'}
-                    onChange={(v) => setFormData({ ...formData, panel_port: v })}
-                  />
-                </section>
-
-                <section className="glass p-8 rounded-[32px] border border-white/5 space-y-6 glow">
-                   <SectionTitle icon={<Zap className="w-4 h-4" />} title="Notifications" />
-                   <SettingInput
-                    label="Telegram Bot Token"
-                    value={formData.telegram_token || ''}
-                    onChange={(v) => setFormData({ ...formData, telegram_token: v })}
-                    placeholder="123456789:ABC..."
-                  />
-                  <SettingInput
-                    label="Telegram Chat ID"
-                    value={formData.telegram_chat_id || ''}
-                    onChange={(v) => setFormData({ ...formData, telegram_chat_id: v })}
-                    placeholder="123456789"
-                  />
-                </section>
-              </div>
+              <SystemSettings formData={formData} setFormData={setFormData} />
             )}
 
             {activeTab === 'general' && (
-              <div className="space-y-6">
-                <section className="glass p-8 rounded-[32px] border border-white/5 space-y-6 glow">
-                  <SectionTitle icon={<Info className="w-4 h-4" />} title="Core Configuration" />
-                  <JsonEditor 
-                    label="Logging"
-                    value={formData.xray_config_log || ''}
-                    onChange={(v: string) => setFormData({ ...formData, xray_config_log: v })}
-                  />
-                  <JsonEditor 
-                    label="Policy (User Levels & Stats)"
-                    value={formData.xray_config_policy || ''}
-                    onChange={(v: string) => setFormData({ ...formData, xray_config_policy: v })}
-                  />
-                </section>
-              </div>
+              <XrayGeneralTab formData={formData} setFormData={setFormData} />
             )}
 
             {activeTab === 'routing' && (
               <section className="glass p-8 rounded-[32px] border border-white/5 space-y-6 glow">
-                <SectionTitle icon={<Network className="w-4 h-4" />} title="Global Routing" />
+                <SectionTitle icon={<Network className="w-4 h-4" />} title="Advanced Routing" subtitle="Define complex traffic redirection rules (JSON format)" />
                 <JsonEditor 
-                  label="Routing Rules & Strategy"
                   value={formData.xray_config_routing || ''}
                   onChange={(v: string) => setFormData({ ...formData, xray_config_routing: v })}
                   height="h-[400px]"
@@ -231,9 +177,8 @@ export default function Settings() {
 
             {activeTab === 'dns' && (
               <section className="glass p-8 rounded-[32px] border border-white/5 space-y-6 glow">
-                <SectionTitle icon={<Globe className="w-4 h-4" />} title="DNS Settings" />
+                <SectionTitle icon={<Globe className="w-4 h-4" />} title="DNS Resolvers" subtitle="Configure upstream DNS servers and mapping" />
                 <JsonEditor 
-                  label="DNS Configuration"
                   value={formData.xray_config_dns || ''}
                   onChange={(v: string) => setFormData({ ...formData, xray_config_dns: v })}
                 />
@@ -242,9 +187,8 @@ export default function Settings() {
 
             {activeTab === 'outbounds' && (
               <section className="glass p-8 rounded-[32px] border border-white/5 space-y-6 glow">
-                <SectionTitle icon={<Share2 className="w-4 h-4" />} title="Outbound Detours" />
+                <SectionTitle icon={<Share2 className="w-4 h-4" />} title="Outbound Detours" subtitle="Manage external destinations and proxy chaining" />
                 <JsonEditor 
-                  label="Outbounds List"
                   value={formData.xray_config_outbounds || ''}
                   onChange={(v: string) => setFormData({ ...formData, xray_config_outbounds: v })}
                   height="h-[300px]"
@@ -258,18 +202,261 @@ export default function Settings() {
   );
 }
 
-function SectionTitle({ icon, title }: { icon: any, title: string }) {
+// --- Components ---
+
+function SystemSettings({ formData, setFormData }: any) {
     return (
-        <div className="flex items-center gap-3 mb-2">
-            <div className="p-2 rounded-xl bg-primary/10 text-primary border border-primary/20">
-                {icon}
-            </div>
-            <h2 className="text-lg font-bold">{title}</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <section className="glass p-8 rounded-[32px] border border-white/5 space-y-6 glow">
+                <SectionTitle icon={<Layers className="w-4 h-4" />} title="Environment" subtitle="Panel and Xray executable paths" />
+                <SettingInput
+                label="Xray Binary"
+                icon={<Terminal className="w-4 h-4" />}
+                value={formData.xray_binary || ''}
+                onChange={(v) => setFormData({ ...formData, xray_binary: v })}
+                placeholder="/usr/local/bin/xray"
+                />
+                <SettingInput
+                label="Config Output"
+                icon={<Database className="w-4 h-4" />}
+                value={formData.xray_config_path || ''}
+                onChange={(v) => setFormData({ ...formData, xray_config_path: v })}
+                placeholder="/etc/vgate/xray_config.json"
+                />
+                <SettingInput
+                label="Panel Port"
+                type="number"
+                icon={<Hash className="w-4 h-4" />}
+                value={formData.panel_port || '4000'}
+                onChange={(v) => setFormData({ ...formData, panel_port: v })}
+                />
+            </section>
+
+            <section className="glass p-8 rounded-[32px] border border-white/5 space-y-6 glow">
+                <SectionTitle icon={<Zap className="w-4 h-4" />} title="Telegram Bot" subtitle="Get notifications and manage clients via TG" />
+                <SettingInput
+                label="Bot Token"
+                value={formData.telegram_token || ''}
+                onChange={(v) => setFormData({ ...formData, telegram_token: v })}
+                placeholder="123456789:ABC..."
+                />
+                <SettingInput
+                label="Target Chat ID"
+                value={formData.telegram_chat_id || ''}
+                onChange={(v) => setFormData({ ...formData, telegram_chat_id: v })}
+                placeholder="123456789"
+                />
+            </section>
         </div>
     );
 }
 
-function JsonEditor({ label, value, onChange, height = "h-[200px]" }: any) {
+function XrayGeneralTab({ formData, setFormData }: any) {
+    // Parse complex fields
+    const logObj = useMemo(() => {
+        try { return JSON.parse(formData.xray_config_log || '{}'); } catch { return {}; }
+    }, [formData.xray_config_log]);
+
+    const policyObj = useMemo(() => {
+        try { return JSON.parse(formData.xray_config_policy || '{}'); } catch { return {}; }
+    }, [formData.xray_config_policy]);
+
+    const routingObj = useMemo(() => {
+        try { return JSON.parse(formData.xray_config_routing || '{}'); } catch { return {}; }
+    }, [formData.xray_config_routing]);
+
+    const updateLog = (update: any) => {
+        const newVal = JSON.stringify({ ...logObj, ...update });
+        setFormData((prev: any) => ({ ...prev, xray_config_log: newVal }));
+    };
+
+    const updatePolicy = (update: any) => {
+        const newVal = { 
+            levels: { ...(policyObj.levels || {}) },
+            system: { ...(policyObj.system || {}) },
+            ...update 
+        };
+        // Deep merge helper
+        if (update.system) newVal.system = { ...newVal.system, ...update.system };
+        if (update.levels) newVal.levels["0"] = { ...(newVal.levels["0"] || {}), ...update.levels["0"] };
+
+        setFormData((prev: any) => ({ ...prev, xray_config_policy: JSON.stringify(newVal) }));
+    };
+
+    const updateRouting = (update: any) => {
+        setFormData((prev: any) => ({ ...prev, xray_config_routing: JSON.stringify({ ...routingObj, ...update }) }));
+    };
+
+    return (
+        <div className="space-y-6">
+            {/* Basic Config */}
+            <section className="glass p-8 rounded-[32px] border border-white/5 space-y-6 glow">
+                <SectionTitle icon={<Info className="w-4 h-4" />} title="Basic Options" subtitle="Core behavior and domain strategies" />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <SelectInput 
+                        label="Domain Resolution Strategy" 
+                        value={routingObj.domainStrategy || 'AsIs'}
+                        options={[
+                            { label: 'AsIs (Default)', value: 'AsIs' },
+                            { label: 'IPIfNonMatch', value: 'IPIfNonMatch' },
+                            { label: 'IPOnDemand', value: 'IPOnDemand' }
+                        ]}
+                        onChange={(v) => updateRouting({ domainStrategy: v })}
+                    />
+                    <SelectInput 
+                        label="Log Level" 
+                        value={logObj.loglevel || 'warning'}
+                        options={[
+                            { label: 'Debug', value: 'debug' },
+                            { label: 'Info', value: 'info' },
+                            { label: 'Warning', value: 'warning' },
+                            { label: 'Error', value: 'error' },
+                            { label: 'None', value: 'none' }
+                        ]}
+                        onChange={(v) => updateLog({ loglevel: v })}
+                    />
+                </div>
+            </section>
+
+            {/* Statistics */}
+            <section className="glass p-8 rounded-[32px] border border-white/5 space-y-6 glow">
+                <SectionTitle icon={<Hash className="w-4 h-4" />} title="Traffic Statistics" subtitle="Enable real-time tracking for inbounds and users" />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4">
+                    <ToggleInput 
+                        label="Inbound Uplink Stats" 
+                        description="Enables tracking for outgoing traffic from all inbounds"
+                        value={policyObj.system?.statsInboundUplink}
+                        onChange={(v) => updatePolicy({ system: { statsInboundUplink: v } })}
+                    />
+                    <ToggleInput 
+                        label="Inbound Downlink Stats" 
+                        description="Enables tracking for incoming traffic for all inbounds"
+                        value={policyObj.system?.statsInboundDownlink}
+                        onChange={(v) => updatePolicy({ system: { statsInboundDownlink: v } })}
+                    />
+                    <ToggleInput 
+                        label="User Uplink Stats" 
+                        description="Detailed tracking for individual client uploads"
+                        value={policyObj.levels?.["0"]?.statsUserUplink}
+                        onChange={(v) => updatePolicy({ levels: { "0": { statsUserUplink: v } } })}
+                    />
+                    <ToggleInput 
+                        label="User Downlink Stats" 
+                        description="Detailed tracking for individual client downloads"
+                        value={policyObj.levels?.["0"]?.statsUserDownlink}
+                        onChange={(v) => updatePolicy({ levels: { "0": { statsUserDownlink: v } } })}
+                    />
+                </div>
+            </section>
+
+             {/* Advanced Logging */}
+             <section className="glass p-8 rounded-[32px] border border-white/5 space-y-6 glow">
+                <SectionTitle icon={<Terminal className="w-4 h-4" />} title="Advanced Logging" subtitle="Fine-grained control over log output" />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <SettingInput label="Access Log Path" value={logObj.access || ''} onChange={(v) => updateLog({ access: v })} placeholder="none" />
+                    <SettingInput label="Error Log Path" value={logObj.error || ''} onChange={(v) => updateLog({ error: v })} placeholder="none" />
+                </div>
+                <ToggleInput 
+                    label="Enable DNS Logging" 
+                    description="Write DNS resolution queries to the system log"
+                    value={logObj.dnsLog}
+                    onChange={(v) => updateLog({ dnsLog: v })}
+                />
+            </section>
+
+            {/* Base Protection */}
+            <section className="glass p-8 rounded-[32px] border border-white/5 space-y-6 glow">
+                <SectionTitle icon={<Shield className="w-4 h-4" />} title="Security & Rules" subtitle="Block unwanted traffic and protocols" />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4">
+                    <ToggleInput 
+                        label="Block BitTorrent" 
+                        description="Prevent clients from using P2P/Torrent protocols"
+                        value={formData.block_bittorrent === 'true'}
+                        onChange={(v) => setFormData({ ...formData, block_bittorrent: v ? 'true' : 'false' })}
+                    />
+                    <ToggleInput 
+                        label="Block Private IPs" 
+                        description="Deny access to local network addresses (LAN)"
+                        value={formData.block_private_ips === 'true'}
+                        onChange={(v) => setFormData({ ...formData, block_private_ips: v ? 'true' : 'false' })}
+                    />
+                    <ToggleInput 
+                        label="Block Advertisements" 
+                        description="Filter known ad-serving domains and trackers"
+                        value={formData.block_ads === 'true'}
+                        onChange={(v) => setFormData({ ...formData, block_ads: v ? 'true' : 'false' })}
+                    />
+                </div>
+            </section>
+        </div>
+    );
+}
+
+// --- UI Atoms ---
+
+function SectionTitle({ icon, title, subtitle }: { icon: any, title: string, subtitle?: string }) {
+    return (
+        <div className="flex flex-col gap-1 mb-2">
+            <div className="flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-primary/10 text-primary border border-primary/20">
+                    {icon}
+                </div>
+                <h2 className="text-lg font-bold">{title}</h2>
+            </div>
+            {subtitle && <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-widest ml-1">{subtitle}</p>}
+        </div>
+    );
+}
+
+function ToggleInput({ label, description, value, onChange }: { label: string, description: string, value: boolean, onChange: (v: boolean) => void }) {
+    return (
+        <div className="flex items-center justify-between py-2">
+            <div className="space-y-0.5">
+                <p className="text-sm font-bold">{label}</p>
+                <p className="text-[10px] text-muted-foreground max-w-[250px] leading-relaxed">{description}</p>
+            </div>
+            <button
+                type="button"
+                onClick={() => onChange(!value)}
+                className={`
+                    w-12 h-6 rounded-full transition-all relative
+                    ${value ? 'bg-primary' : 'bg-white/10'}
+                `}
+            >
+                <div className={`
+                    absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform
+                    ${value ? 'translate-x-6' : 'translate-x-0'}
+                `} />
+            </button>
+        </div>
+    );
+}
+
+function SelectInput({ label, value, options, onChange }: { label: string, value: string, options: { label: string, value: string }[], onChange: (v: string) => void }) {
+    return (
+        <div className="space-y-2">
+            <label className="text-xs font-black uppercase tracking-widest text-muted-foreground ml-1">{label}</label>
+            <div className="relative group">
+                <select
+                    value={value}
+                    onChange={(e) => onChange(e.target.value)}
+                    className="w-full bg-white/[0.03] border border-white/5 rounded-2xl py-3.5 px-4 focus:outline-none focus:border-primary/50 focus:bg-white/[0.05] transition-all font-medium text-sm appearance-none cursor-pointer"
+                >
+                    {options.map((opt) => (
+                        <option key={opt.value} value={opt.value} className="bg-[#0c0c0e] text-white py-2">
+                            {opt.label}
+                        </option>
+                    ))}
+                </select>
+                <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-muted-foreground">
+                    <ChevronDown className="w-4 h-4" />
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function JsonEditor({ value, onChange, height = "h-[200px]" }: any) {
     const [isValid, setIsValid] = useState(true);
     
     const handleChange = (val: string) => {
@@ -284,9 +471,8 @@ function JsonEditor({ label, value, onChange, height = "h-[200px]" }: any) {
 
     return (
         <div className="space-y-2">
-            <div className="flex justify-between items-center">
-                <label className="text-xs font-black uppercase tracking-widest text-muted-foreground ml-1">{label}</label>
-                {!isValid && <span className="text-[10px] font-bold text-red-400 uppercase tracking-tighter">Invalid JSON</span>}
+            <div className="flex justify-end">
+                {!isValid && <span className="text-[10px] font-bold text-red-400 uppercase tracking-tighter">Invalid JSON Format</span>}
             </div>
             <textarea
                 value={value}

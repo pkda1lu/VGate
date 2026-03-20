@@ -61,6 +61,27 @@ export class XrayService {
     const routingSection = JSON.parse(await settingsService.getSetting('xray_config_routing', '{"rules":[]}') as string);
     const policySection = JSON.parse(await settingsService.getSetting('xray_config_policy', '{"levels":{"0":{"statsUserUplink":true,"statsUserDownlink":true}}}') as string);
 
+    // Protection flags
+    const blockBittorrent = await settingsService.getSetting('block_bittorrent') === 'true';
+    const blockPrivateIps = await settingsService.getSetting('block_private_ips') === 'true';
+    const blockAds = await settingsService.getSetting('block_ads') === 'true';
+
+    // Ensure base api rule exists
+    if (!routingSection.rules.find((r: any) => r.inboundTag?.[0] === 'api')) {
+        routingSection.rules.unshift({ type: "field", inboundTag: ["api"], outboundTag: "api" });
+    }
+
+    // Add protection rules if enabled
+    if (blockBittorrent) {
+        routingSection.rules.push({ type: "field", protocol: ["bittorrent"], outboundTag: "blocked" });
+    }
+    if (blockPrivateIps) {
+        routingSection.rules.push({ type: "field", ip: ["geoip:private"], outboundTag: "blocked" });
+    }
+    if (blockAds) {
+        routingSection.rules.push({ type: "field", domain: ["geosite:category-ads-all"], outboundTag: "blocked" });
+    }
+
     const config = {
       log: logSection,
       stats: {}, 

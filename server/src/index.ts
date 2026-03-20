@@ -80,6 +80,9 @@ async function start() {
         levels: { "0": { statsUserUplink: true, statsUserDownlink: true } },
         system: { statsInboundUplink: true, statsInboundDownlink: true }
       }),
+      block_bittorrent: 'true',
+      block_private_ips: 'true',
+      block_ads: 'false',
     };
     for (const [key, value] of Object.entries(defaults)) {
       const existing = await settingsService.getSetting(key);
