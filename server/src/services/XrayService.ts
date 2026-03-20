@@ -7,7 +7,7 @@ export class XrayService {
   private static instance: XrayService;
   private process: ChildProcess | null = null;
   private configPath: string = path.join(process.cwd(), 'xray_config.json');
-  private xrayBinary: string = process.platform === 'win32' ? 'xray.exe' : 'xray';
+  private xrayBinary: string = process.platform === 'win32' ? 'xray.exe' : '/usr/local/bin/xray';
 
   private constructor() {}
 
