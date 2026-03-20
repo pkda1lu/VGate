@@ -36,7 +36,10 @@ cp -r . /etc/vgate/
 cd /etc/vgate
 
 echo -e "Building Server Backend..."
-cd server && npm install && npm run build && cd ..
+cd server && npm install && npm run build
+echo -e "Syncing Database Schema..."
+npx drizzle-kit push
+cd ..
 
 echo -e "Building Management Dashboard..."
 cd client && npm install && npm run build && cd ..
