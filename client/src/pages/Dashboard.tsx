@@ -16,18 +16,37 @@ import {
   Tooltip 
 } from 'recharts';
 import useSWR from 'swr';
-import { getInbounds, getClients } from '../lib/api';
+import { getInbounds, getClients, getSystemMetrics } from '../lib/api';
+
+const formatBytes = (bytes: number) => {
+  if (bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+};
+
+const formatUptime = (seconds: number) => {
+  const d = Math.floor(seconds / (3600 * 24));
+  const h = Math.floor(seconds % (3600 * 24) / 3600);
+  const m = Math.floor(seconds % 3600 / 60);
+  return `${d}d ${h}h ${m}m`;
+};
 
 export default function Dashboard() {
   const { data: inbounds, isLoading: loadingInbounds } = useSWR('/inbounds', () => getInbounds().then(res => res.data));
   const { data: clients, isLoading: loadingClients } = useSWR('/clients', () => getClients().then(res => res.data));
+  const { data: metrics, isLoading: loadingMetrics } = useSWR('/system/metrics', () => getSystemMetrics().then(res => res.data), { refreshInterval: 5000 });
 
   const totalClients = clients?.length || 0;
   const onlineClients = clients?.filter((c: any) => c.enabled).length || 0;
   
   const totalInbounds = inbounds?.length || 0;
 
-  if (loadingInbounds || loadingClients) return (
+  // Calculate total traffic from client accounts
+  const totalTrafficRaw = clients?.reduce((acc: number, c: any) => acc + (c.traffic?.total || 0), 0) || 0;
+
+  if (loadingInbounds || loadingClients || loadingMetrics) return (
     <div className="flex items-center justify-center min-h-[500px]">
        <Loader2 className="w-12 h-12 text-primary animate-spin" />
     </div>
@@ -51,22 +70,22 @@ export default function Dashboard() {
           change={`${totalInbounds} Inbounds`} 
         />
         <StatCard 
-          title="Network Throughput" 
-          value="452.8 GB" 
+          title="Total Management" 
+          value={formatBytes(totalTrafficRaw)} 
           icon={<Activity className="w-5 h-5 text-emerald-500" />} 
-          change="Last 30d" 
+          change="Accumulated" 
         />
         <StatCard 
-          title="Real-time RX" 
-          value="1.2 MB/s" 
-          icon={<ArrowDownLeft className="w-5 h-5 text-sky-500" />} 
-          trend="down"
+          title="Processor" 
+          value={`${metrics?.cpu || 0}%`} 
+          icon={<Cpu className="w-5 h-5 text-sky-500" />} 
+          change="Active Load"
         />
         <StatCard 
-          title="Real-time TX" 
-          value="450 KB/s" 
+          title="Memory Buffer" 
+          value={`${metrics?.memory.percent || 0}%`} 
           icon={<ArrowUpRight className="w-5 h-5 text-orange-500" />} 
-          trend="up"
+          change={formatBytes(metrics?.memory.used || 0)}
         />
       </div>
 
@@ -80,7 +99,7 @@ export default function Dashboard() {
           <div className="h-[300px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={[
-                { t: 0, v: 40 }, { t: 1, v: 30 }, { t: 2, v: 45 }, { t: 3, v: 60 }, { t: 4, v: 48 }, { t: 5, v: 55 }
+                { t: 0, v: 40 }, { t: 1, v: onlineClients * 10 }, { t: 2, v: 45 }, { t: 3, v: onlineClients * 12 }, { t: 4, v: 48 }, { t: 5, v: onlineClients * 15 }
               ]}>
                 <defs>
                   <linearGradient id="colorV" x1="0" y1="0" x2="0" y2="1">
@@ -117,20 +136,20 @@ export default function Dashboard() {
           </h3>
           
           <div className="space-y-5">
-            <ResourceBar label="Processor Load" value={24} icon={<Cpu className="w-4 h-4" />} color="bg-primary" />
-            <ResourceBar label="Memory Buffer" value={62} icon={<Activity className="w-4 h-4" />} color="bg-emerald-500" />
-            <ResourceBar label="Storage Pool" value={38} icon={<HardDrive className="w-4 h-4" />} color="bg-sky-500" />
+            <ResourceBar label="Processor Load" value={metrics?.cpu || 0} icon={<Cpu className="w-4 h-4" />} color="bg-primary" />
+            <ResourceBar label="Memory Buffer" value={metrics?.memory.percent || 0} icon={<Activity className="w-4 h-4" />} color="bg-emerald-500" />
+            <ResourceBar label="Storage Pool" value={metrics?.disk.percent || 0} icon={<HardDrive className="w-4 h-4" />} color="bg-sky-500" />
           </div>
 
           <div className="mt-auto pt-6 border-t border-white/5 space-y-4">
             <div className="flex justify-between items-center text-sm">
               <span className="text-muted-foreground font-medium">Uptime Status</span>
-              <span className="font-mono text-white/90">14d 08h 12m</span>
+              <span className="font-mono text-white/90">{formatUptime(metrics?.uptime || 0)}</span>
             </div>
             <div className="flex justify-between items-center text-sm">
               <span className="text-muted-foreground font-medium">Xray Version</span>
               <span className="flex items-center gap-2 text-emerald-400 font-bold uppercase tracking-widest text-[10px]">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" /> 1.8.4
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" /> {metrics?.xrayVersion || 'v1.8.4'}
               </span>
             </div>
           </div>

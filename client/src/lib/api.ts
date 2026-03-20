@@ -17,4 +17,6 @@ export const updateSettings = (data: Record<string, string>) => api.post('/setti
 export const restartXray = () => api.post('/settings/restart');
 export const getLogs = () => api.get('/settings/logs');
 
+export const getSystemMetrics = () => api.get('/system/metrics');
+
 export default api;
