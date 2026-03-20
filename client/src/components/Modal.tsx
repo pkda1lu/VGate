@@ -6,9 +6,18 @@ interface ModalProps {
   onClose: () => void;
   title: string;
   children: React.ReactNode;
+  size?: 'md' | 'lg' | 'xl' | '2xl' | '4xl';
 }
 
-export default function Modal({ isOpen, onClose, title, children }: ModalProps) {
+const sizeClasses = {
+  md: 'max-w-md',
+  lg: 'max-w-lg',
+  xl: 'max-w-xl',
+  '2xl': 'max-w-2xl',
+  '4xl': 'max-w-4xl'
+};
+
+export default function Modal({ isOpen, onClose, title, children, size = 'lg' }: ModalProps) {
   return (
     <AnimatePresence>
       {isOpen && (
@@ -27,7 +36,7 @@ export default function Modal({ isOpen, onClose, title, children }: ModalProps) 
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="relative w-full max-w-lg glass rounded-3xl glow overflow-hidden flex flex-col max-h-[90vh]"
+            className={`relative w-full ${sizeClasses[size]} glass rounded-3xl glow overflow-hidden flex flex-col max-h-[90vh]`}
           >
             {/* Header */}
             <div className="p-6 border-b border-white/5 flex justify-between items-center bg-white/[0.02]">

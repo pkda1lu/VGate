@@ -29,10 +29,12 @@ api.interceptors.response.use(
 
 export const getInbounds = () => api.get('/inbounds');
 export const createInbound = (data: any) => api.post('/inbounds', data);
+export const updateInbound = (id: number, data: any) => api.put(`/inbounds/${id}`, data);
 export const deleteInbound = (id: number) => api.delete(`/inbounds/${id}`);
 
 export const getClients = () => api.get('/clients');
 export const createClient = (data: any) => api.post('/clients', data);
+export const updateClient = (id: string, data: any) => api.put(`/clients/${id}`, data);
 export const deleteClient = (id: string) => api.delete(`/clients/${id}`);
 
 export const getSettings = () => api.get('/settings');

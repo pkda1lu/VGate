@@ -45,6 +45,27 @@ export default async function clientRoutes(fastify: FastifyInstance, options: Fa
     return client;
   });
 
+  fastify.put('/:id', async (request, reply) => {
+    const { id } = request.params as any;
+    const body = request.body as any;
+    
+    await db.update(clientTable)
+      .set({
+        email: body.email,
+        uuid: body.uuid,
+        flow: body.flow,
+        limitIp: body.limitIp,
+        totalGb: body.totalGb,
+        enabled: body.enabled,
+        expiry: body.expiry ? new Date(body.expiry) : null,
+        updatedAt: new Date(),
+      })
+      .where(eq(clientTable.id, id));
+
+    await xrayService.restart();
+    return { success: true };
+  });
+
   fastify.delete('/:id', async (request, reply) => {
     const { id } = request.params as any;
     await db.delete(clientTable).where(eq(clientTable.id, id));

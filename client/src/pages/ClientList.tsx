@@ -10,25 +10,59 @@ import {
   Loader2,
   AlertCircle,
   Users,
-  Shield,
-  Zap
+  Settings
 } from 'lucide-react';
 import useSWR from 'swr';
 import { useState } from 'react';
-import { getClients, deleteClient, createClient, getInbounds } from '../lib/api';
+import { getClients, deleteClient, createClient, updateClient, getInbounds } from '../lib/api';
 import Modal from '../components/Modal';
+import Toggle from '../components/Toggle';
 
 export default function ClientList() {
   const { data: clients, error, isLoading, mutate } = useSWR('/clients', () => getClients().then(res => res.data));
   const { data: inbounds } = useSWR('/inbounds', () => getInbounds().then(res => res.data));
   
   const [showModal, setShowModal] = useState(false);
-  const [isCreating, setIsCreating] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [editingClient, setEditingClient] = useState<any>(null);
+
   const [formData, setFormData] = useState({
     inboundId: '',
     email: '',
+    uuid: crypto.randomUUID() as string,
+    flow: 'none',
     totalGb: 0,
+    enabled: true,
+    expiry: ''
   });
+
+  const openCreateModal = () => {
+    setEditingClient(null);
+    setFormData({
+      inboundId: inbounds?.[0]?.id || '',
+      email: '',
+      uuid: crypto.randomUUID(),
+      flow: 'xtls-rprx-vision',
+      totalGb: 0,
+      enabled: true,
+      expiry: ''
+    });
+    setShowModal(true);
+  };
+
+  const openEditModal = (client: any) => {
+    setEditingClient(client);
+    setFormData({
+      inboundId: client.inboundId,
+      email: client.email,
+      uuid: client.uuid,
+      flow: client.flow || 'none',
+      totalGb: client.totalGb || 0,
+      enabled: client.enabled,
+      expiry: client.expiry ? new Date(client.expiry).toISOString().slice(0, 16) : ''
+    });
+    setShowModal(true);
+  };
 
   const handleDelete = async (id: string) => {
     if (confirm('Are you sure you want to delete this client?')) {
@@ -37,17 +71,20 @@ export default function ClientList() {
     }
   };
 
-  const handleCreate = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.inboundId) return alert('Select a proxy node first');
-    setIsCreating(true);
+    setIsSubmitting(true);
     try {
-      await createClient(formData);
+      if (editingClient) {
+        await updateClient(editingClient.id, formData);
+      } else {
+        await createClient(formData);
+      }
       setShowModal(false);
       mutate();
-      setFormData({ inboundId: '', email: '', totalGb: 0 });
     } finally {
-      setIsCreating(false);
+      setIsSubmitting(false);
     }
   };
 
@@ -81,10 +118,10 @@ export default function ClientList() {
         </div>
         <div className="flex gap-3">
           <button onClick={() => mutate()} className="glass hover:bg-white/[0.05] text-foreground px-4 py-2.5 rounded-2xl font-semibold flex items-center gap-2 border border-white/10 transition-all">
-            <RefreshCcw className="w-4 h-4" /> Refresh
+            <RefreshCcw className="w-4 h-4" />
           </button>
           <button 
-            onClick={() => setShowModal(true)}
+            onClick={openCreateModal}
             className="bg-primary hover:bg-primary/90 text-white px-5 py-2.5 rounded-2xl font-semibold flex items-center gap-2 transition-all glow shadow-primary/20"
           >
             <Plus className="w-4 h-4" /> Create Client
@@ -93,7 +130,12 @@ export default function ClientList() {
       </header>
 
       <div className="grid grid-cols-1 gap-4">
-        {clients?.map((client: any) => (
+        {clients?.map((client: any) => {
+          const usageBytes = client.traffic?.total || 0;
+          const limitBytes = (client.totalGb || 0) * (1024**3);
+          const usageGB = (usageBytes / (1024**3)).toFixed(2);
+          const pct = getTrafficPercentage(usageBytes, limitBytes);
+          return (
           <div key={client.id} className="glass p-6 rounded-3xl glow group hover:border-primary/20 transition-all flex flex-col md:flex-row md:items-center gap-6">
              <div className="p-3.5 rounded-2xl bg-primary/10 border border-primary/20 text-primary self-start shadow-[0_0_15px_rgba(139,92,246,0.1)]">
                <Mail className="w-6 h-6" />
@@ -108,19 +150,19 @@ export default function ClientList() {
                 </h4>
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground font-medium">
                   <span className="flex items-center gap-1.5 font-mono"><Navigation className="w-3.5 h-3.5" /> {client.uuid.substring(0, 18)}...</span>
-                  <span className="flex items-center gap-1.5"><Clock className="w-3.5 h-3.5" /> {client.expiry ? new Date(client.expiry).toLocaleDateString() : 'No Expiry'}</span>
+                  <span className="flex items-center gap-1.5"><Clock className="w-3.5 h-3.5" /> {client.expiry ? new Date(client.expiry).toLocaleDateString() : 'No expiry'}</span>
                 </div>
              </div>
 
-             <div className="flex flex-col gap-1 min-w-[160px]">
+             <div className="flex flex-col gap-1 min-w-[200px]">
                 <div className="flex justify-between text-[10px] font-black uppercase tracking-widest mb-1">
-                   <span className="text-muted-foreground">Quota Usage</span>
-                   <span className="text-primary">{(client.traffic?.total / (1024**3)).toFixed(2)} / {client.totalGb || '∞'} GB</span>
+                   <span className="text-muted-foreground">Usage</span>
+                   <span className="text-primary">{usageGB} / {client.totalGb ? `${client.totalGb} GB` : '∞'}</span>
                 </div>
-                <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
+                <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden flex">
                    <div 
                       className={`h-full transition-all duration-1000 ${!client.enabled ? 'bg-red-400' : 'bg-primary'}`} 
-                      style={{ width: `${getTrafficPercentage(client.traffic?.total || 0, (client.totalGb || 0) * (1024**3))}%` }}
+                      style={{ width: `${pct}%` }}
                     />
                 </div>
              </div>
@@ -128,10 +170,11 @@ export default function ClientList() {
              <div className="flex gap-2">
                 <IconBtn tooltip="Copy Node Link" icon={<Copy className="w-4 h-4" />} />
                 <IconBtn tooltip="Show QR Code" icon={<QrCode className="w-4 h-4" />} />
+                <IconBtn onClick={() => openEditModal(client)} tooltip="Edit Client" icon={<Settings className="w-4 h-4" />} color="text-sky-400 hover:bg-sky-500/10" />
                 <IconBtn onClick={() => handleDelete(client.id)} tooltip="Delete User" icon={<Trash2 className="w-4 h-4" />} color="text-red-400 hover:bg-red-500/10" />
              </div>
           </div>
-        ))}
+        )})}
         {clients?.length === 0 && (
           <div className="glass p-12 rounded-3xl border-dashed border-white/5 flex flex-col items-center justify-center gap-4 text-center opacity-50">
              <Users className="w-12 h-12 text-muted-foreground" />
@@ -143,72 +186,119 @@ export default function ClientList() {
       <Modal 
         isOpen={showModal} 
         onClose={() => setShowModal(false)} 
-        title="Add New Client"
+        title={editingClient ? "Редактировать клиента" : "Создать подключение (Клиент)"}
+        size="2xl"
       >
-        <form onSubmit={handleCreate} className="space-y-6">
-          <div className="space-y-2">
-            <label className="text-xs font-black uppercase tracking-widest text-muted-foreground ml-1">Parent Node</label>
-            <div className="relative group">
-              <Shield className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors pointer-events-none" />
-              <select
-                required
-                value={formData.inboundId}
-                onChange={(e) => setFormData({ ...formData, inboundId: e.target.value })}
-                className="w-full bg-white/[0.03] border border-white/5 rounded-2xl py-3 pl-12 pr-4 focus:outline-none focus:border-primary/50 focus:bg-white/[0.05] transition-all font-medium appearance-none"
-              >
-                <option value="" disabled className="bg-background">Select an Inbound...</option>
-                {inbounds?.map((node: any) => (
-                  <option key={node.id} value={node.id} className="bg-background">
-                    {node.tag} ({node.protocol}:{node.port})
-                  </option>
-                ))}
-              </select>
-            </div>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          
+          <div className="grid grid-cols-[160px_1fr] items-center gap-4 group">
+             <label className="text-sm font-semibold text-right text-muted-foreground group-focus-within:text-foreground">Включить</label>
+             <div className="bg-white/[0.03] border border-white/5 rounded-xl px-4 py-2.5 h-11 flex items-center">
+                <Toggle checked={formData.enabled} onChange={(v) => setFormData({...formData, enabled: v})} />
+             </div>
           </div>
 
-          <div className="space-y-2">
-            <label className="text-xs font-black uppercase tracking-widest text-muted-foreground ml-1">Client Email</label>
-            <div className="relative group">
-              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
-              <input
-                required
-                type="email"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                placeholder="user@example.com"
-                className="w-full bg-white/[0.03] border border-white/5 rounded-2xl py-3 pl-12 pr-4 focus:outline-none focus:border-primary/50 focus:bg-white/[0.05] transition-all font-medium"
-              />
-            </div>
+          <div className="grid grid-cols-[160px_1fr] items-center gap-4 group">
+             <label className="text-sm font-semibold text-right text-muted-foreground group-focus-within:text-foreground">Parent Inbound</label>
+             <div className="relative">
+                <select
+                  required
+                  value={formData.inboundId}
+                  onChange={(e) => setFormData({ ...formData, inboundId: e.target.value })}
+                  className="w-full bg-white/[0.03] border border-white/5 rounded-xl h-11 px-4 focus:outline-none focus:border-primary/50 focus:bg-white/[0.05] transition-all text-sm appearance-none"
+                >
+                  <option value="" disabled className="bg-background">Select an Inbound...</option>
+                  {inbounds?.map((node: any) => (
+                    <option key={node.id} value={node.id} className="bg-background">
+                      {node.tag} ({node.protocol}:{node.port})
+                    </option>
+                  ))}
+                </select>
+             </div>
           </div>
 
-          <div className="space-y-2">
-            <label className="text-xs font-black uppercase tracking-widest text-muted-foreground ml-1">Traffic Limit (GB)</label>
-            <div className="relative group">
-              <Zap className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
-              <input
-                type="number"
-                value={formData.totalGb}
-                onChange={(e) => setFormData({ ...formData, totalGb: parseFloat(e.target.value) })}
-                placeholder="0 = Unlimited"
-                className="w-full bg-white/[0.03] border border-white/5 rounded-2xl py-3 pl-12 pr-4 focus:outline-none focus:border-primary/50 focus:bg-white/[0.05] transition-all font-medium"
-              />
-            </div>
+          <div className="grid grid-cols-[160px_1fr] items-center gap-4 group">
+             <label className="text-sm font-semibold text-right text-muted-foreground group-focus-within:text-foreground">Email</label>
+             <input
+               required
+               type="text"
+               value={formData.email}
+               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+               placeholder="user@example.com"
+               className="w-full bg-white/[0.03] border border-white/5 rounded-xl h-11 px-4 focus:outline-none focus:border-primary/50 focus:bg-white/[0.05] transition-all text-sm"
+             />
           </div>
 
-          <div className="pt-4 flex gap-3">
+          <div className="grid grid-cols-[160px_1fr] items-center gap-4 group">
+             <label className="text-sm font-semibold text-right text-muted-foreground group-focus-within:text-foreground">ID</label>
+             <div className="relative flex items-center">
+               <input
+                 required
+                 type="text"
+                 value={formData.uuid}
+                 onChange={(e) => setFormData({ ...formData, uuid: e.target.value })}
+                 className="w-full bg-white/[0.03] border border-white/5 rounded-xl h-11 pl-4 pr-12 focus:outline-none focus:border-primary/50 focus:bg-white/[0.05] transition-all text-sm font-mono text-muted-foreground"
+               />
+               <button type="button" onClick={() => setFormData({...formData, uuid: crypto.randomUUID()})} className="absolute right-3 p-1 hover:text-primary transition-colors text-muted-foreground">
+                  <RefreshCcw className="w-4 h-4" />
+               </button>
+             </div>
+          </div>
+
+          <div className="grid grid-cols-[160px_1fr] items-center gap-4 group">
+             <label className="text-sm font-semibold text-right text-muted-foreground group-focus-within:text-foreground">Flow</label>
+             <select
+               value={formData.flow}
+               onChange={(e) => setFormData({ ...formData, flow: e.target.value })}
+               className="w-full bg-white/[0.03] border border-white/5 rounded-xl h-11 px-4 focus:outline-none focus:border-primary/50 focus:bg-white/[0.05] transition-all text-sm appearance-none"
+             >
+               <option value="none" className="bg-background">none</option>
+               <option value="xtls-rprx-vision" className="bg-background">xtls-rprx-vision</option>
+               <option value="xtls-rprx-vision-udp443" className="bg-background">xtls-rprx-vision-udp443</option>
+             </select>
+          </div>
+
+          <div className="grid grid-cols-[160px_1fr] items-center gap-4 group">
+             <div className="flex items-center justify-end gap-1.5 text-muted-foreground group-focus-within:text-foreground">
+                <label className="text-sm font-semibold">Общий расход</label>
+                <div className="w-4 h-4 rounded-full border border-current flex items-center justify-center text-[10px] font-bold">?</div>
+             </div>
+             <input
+               type="number"
+               value={formData.totalGb}
+               onChange={(e) => setFormData({ ...formData, totalGb: parseFloat(e.target.value) })}
+               placeholder="0"
+               className="w-full bg-white/[0.03] border border-white/5 rounded-xl h-11 px-4 focus:outline-none focus:border-primary/50 focus:bg-white/[0.05] transition-all text-sm"
+             />
+          </div>
+
+          <div className="grid grid-cols-[160px_1fr] items-center gap-4 group">
+             <div className="flex items-center justify-end gap-1.5 text-muted-foreground group-focus-within:text-foreground">
+                <label className="text-sm font-semibold">Дата окончания</label>
+                <div className="w-4 h-4 rounded-full border border-current flex items-center justify-center text-[10px] font-bold">?</div>
+             </div>
+             <input
+               type="datetime-local"
+               value={formData.expiry}
+               onChange={(e) => setFormData({ ...formData, expiry: e.target.value })}
+               className="w-full bg-white/[0.03] border border-white/5 rounded-xl h-11 px-4 focus:outline-none focus:border-primary/50 focus:bg-white/[0.05] transition-all text-sm [color-scheme:dark]"
+             />
+          </div>
+
+          <div className="pt-8 flex gap-3 justify-end items-center border-t border-white/5 mt-8">
              <button
                type="button"
                onClick={() => setShowModal(false)}
-               className="flex-1 bg-white/5 hover:bg-white/10 text-foreground font-bold py-3 rounded-2xl border border-white/5 transition-all"
+               className="bg-transparent hover:bg-white/5 text-foreground font-semibold px-6 py-2.5 rounded-xl transition-all"
              >
-               Cancel
+               Закрыть
              </button>
              <button
-               disabled={isCreating}
-               className="flex-1 bg-primary hover:bg-primary/90 text-white font-bold py-3 rounded-2xl shadow-lg shadow-primary/20 transition-all flex items-center justify-center gap-2"
+               disabled={isSubmitting}
+               className="bg-emerald-500 hover:bg-emerald-600 text-white font-semibold px-6 py-2.5 rounded-xl shadow-lg shadow-emerald-500/20 transition-all flex items-center gap-2"
              >
-               {isCreating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-               Create Access
+               {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+               {editingClient ? "Сохранить изменения" : "Создать"}
              </button>
           </div>
         </form>
@@ -221,7 +311,7 @@ function IconBtn({ icon, color, tooltip, onClick }: any) {
   return (
     <button 
       onClick={onClick}
-      className={`p-3 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-primary/20 transition-all ${color || 'text-primary'}`} 
+      className={`p-3 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/20 transition-all ${color || 'text-primary'}`} 
       title={tooltip}
     >
       {icon}

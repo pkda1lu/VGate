@@ -58,6 +58,26 @@ export default async function inboundRoutes(fastify: FastifyInstance, options: F
     return inbound;
   });
 
+  fastify.put('/:id', async (request, reply) => {
+    const { id } = request.params as any;
+    const body = request.body as any;
+    
+    await db.update(inboundTable)
+      .set({
+        tag: body.tag,
+        port: body.port,
+        protocol: body.protocol,
+        settings: JSON.stringify(body.settings),
+        sniffing: JSON.stringify(body.sniffing),
+        stream: JSON.stringify(body.stream),
+        updatedAt: new Date(),
+      })
+      .where(eq(inboundTable.id, parseInt(id)));
+
+    await xrayService.restart();
+    return { success: true };
+  });
+
   fastify.delete('/:id', async (request, reply) => {
     const { id } = request.params as any;
     await db.delete(inboundTable).where(eq(inboundTable.id, parseInt(id)));
