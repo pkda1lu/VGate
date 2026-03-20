@@ -6,8 +6,7 @@ import {
   Zap, 
   Activity, 
   Globe, 
-  Shield, 
-  LogOut 
+  Shield 
 } from 'lucide-react';
 
 const navItems = [
