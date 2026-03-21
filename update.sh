@@ -36,7 +36,14 @@ sqlite3 server/data.db "UPDATE clients SET sub_id = uuid WHERE sub_id IS NULL OR
 sqlite3 server/data.db "CREATE TABLE IF NOT EXISTS nodes (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, address TEXT NOT NULL, api_key TEXT NOT NULL, status TEXT DEFAULT 'offline', last_seen INTEGER, is_master BOOLEAN DEFAULT 0, created_at INTEGER);" 2>/dev/null || true
 sqlite3 server/data.db "INSERT OR IGNORE INTO nodes (id, name, address, api_key, status, is_master) VALUES (1, 'Master Panel', 'localhost', 'master-key', 'online', 1);" 2>/dev/null || true
 
+# 3. Server Build
 echo -e "${GREEN}[3/5]${NC} Server: Dependencies & Build..."
+if [ ! -f "server/package.json" ]; then
+    echo -e "${RED}Error: server/package.json not found in $(pwd)${NC}"
+    ls -lA
+    exit 1
+fi
+
 cd server
 npm install
 # Rebuild better-sqlite3 for current architecture to prevent startup errors
@@ -44,7 +51,13 @@ npm rebuild better-sqlite3 --build-from-source
 npm run build
 cd ..
 
+# 4. Client Build
 echo -e "${GREEN}[4/5]${NC} Client: Dependencies & Build..."
+if [ ! -f "client/package.json" ]; then
+    echo -e "${RED}Error: client/package.json not found in $(pwd)${NC}"
+    exit 1
+fi
+
 cd client
 npm install
 npm run build
