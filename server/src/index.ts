@@ -71,12 +71,23 @@ async function start() {
       }
     });
 
+    // --- Routes ---
+    const subPathSetting = settingsService ? await settingsService.getSetting('sub_path', '/api/sub') : '/api/sub';
+    // Clean subPathSetting for prefix (must not end with / unless it is just /)
+    const cleanSubPrefix = subPathSetting.length > 1 && subPathSetting.endsWith('/') 
+        ? subPathSetting.slice(0, -1) 
+        : subPathSetting;
+
     await fastify.register(inboundRoutes, { prefix: '/api/inbounds' });
     await fastify.register(clientRoutes, { prefix: '/api/clients' });
     await fastify.register(settingsRoutes, { prefix: '/api/settings' });
     await fastify.register(systemRoutes, { prefix: '/api/system' });
     await fastify.register(authRoutes, { prefix: '/api/auth' });
-    await fastify.register(subRoutes, { prefix: '/api/sub' });
+    await fastify.register(subRoutes, { prefix: cleanSubPrefix });
+    // Also register at /api/sub for compatibility if different
+    if (cleanSubPrefix !== '/api/sub') {
+        await fastify.register(subRoutes, { prefix: '/api/sub' });
+    }
     await fastify.register(nodeRoutes, { prefix: '/api/nodes' });
 
     // Auth Middleware
@@ -84,17 +95,24 @@ async function start() {
         const bypass = [
             '/api/auth', 
             '/api/sub', 
+            cleanSubPrefix,
             '/api/settings/xray-config', 
             '/health',
             '/api/nodes/me',
             '/api/nodes/report'
-        ];
+        ].filter(Boolean);
+
         const isBypassed = bypass.some(p => request.url.startsWith(p));
         if (request.url.startsWith('/api') && !isBypassed) {
             const token = request.headers.authorization?.replace('Bearer ', '');
             if (!token) {
                 return reply.code(401).send({ error: 'Unauthorized' });
             }
+        }
+        
+        // Also bypass the custom sub path even if it doesn't start with /api
+        if (request.url.startsWith(cleanSubPrefix) && !isBypassed) {
+             // Handled by isBypassed above
         }
     });
 

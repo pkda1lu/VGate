@@ -10,6 +10,7 @@ export default async function subRoutes(fastify: FastifyInstance, options: Fasti
 
   fastify.get('/:subId', async (request, reply) => {
     const { subId } = request.params as any;
+    console.log(`[SUBSCRIPTION] Request for ID: ${subId} from ${request.ip} (${request.headers['user-agent']})`);
     
     const clients = await db.query.clients.findMany({
       where: eq(clientTable.subId, subId),
