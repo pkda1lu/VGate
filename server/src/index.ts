@@ -20,24 +20,32 @@ import fs from 'fs-extra';
 async function start() {
   let fastify: any;
   try {
-    const { SettingsService } = await import('./services/SettingsService');
-    const settingsService = SettingsService.getInstance();
-    
-    // SSL detection
-    const sslCert = await settingsService.getSetting('ssl_cert');
-    const sslKey = await settingsService.getSetting('ssl_key');
+    const { SlaveService } = await import('./services/SlaveService');
+    const slave = SlaveService.getInstance();
+    const isSlave = slave.isEnabled();
+
+    let settingsService: any = null;
     let httpsOptions: any = undefined;
 
-    if (sslCert && sslKey && fs.existsSync(sslCert) && fs.existsSync(sslKey)) {
-        try {
-            httpsOptions = {
-                cert: fs.readFileSync(sslCert),
-                key: fs.readFileSync(sslKey)
-            };
-            console.log(`[SSL] Secure transport initialized from ${path.basename(sslCert)}`);
-        } catch (sslErr: any) {
-            console.error(`[SSL ERROR] Failed to read certificates: ${sslErr.message}`);
-            console.warn(`[SSL] Falling back to non-secure HTTP for panel access.`);
+    if (!isSlave) {
+        const { SettingsService } = await import('./services/SettingsService');
+        settingsService = SettingsService.getInstance();
+        
+        // SSL detection
+        const sslCert = await settingsService.getSetting('ssl_cert');
+        const sslKey = await settingsService.getSetting('ssl_key');
+
+        if (sslCert && sslKey && fs.existsSync(sslCert) && fs.existsSync(sslKey)) {
+            try {
+                httpsOptions = {
+                    cert: fs.readFileSync(sslCert),
+                    key: fs.readFileSync(sslKey)
+                };
+                console.log(`[SSL] Secure transport initialized from ${path.basename(sslCert)}`);
+            } catch (sslErr: any) {
+                console.error(`[SSL ERROR] Failed to read certificates: ${sslErr.message}`);
+                console.warn(`[SSL] Falling back to non-secure HTTP for panel access.`);
+            }
         }
     }
 
@@ -102,51 +110,52 @@ async function start() {
     // Start Xray
     const xray = XrayService.getInstance();
     
-    const defaults = {
-      xray_binary: process.platform === 'win32' ? 'xray.exe' : '/usr/local/bin/xray',
-      xray_config_path: path.join(process.cwd(), 'xray_config.json'),
-      panel_port: '4000',
-      xray_config_log: JSON.stringify({ loglevel: "warning" }),
-      xray_config_dns: JSON.stringify({ servers: ["1.1.1.1", "8.8.8.8"] }),
-      xray_config_outbounds: JSON.stringify([
-        { protocol: "freedom", tag: "direct", settings: { domainStrategy: "AsIs" } },
-        { protocol: "blackhole", tag: "blocked" }
-      ]),
-      xray_config_routing: JSON.stringify({
-        domainStrategy: "AsIs",
-        rules: [
-          { type: "field", inboundTag: ["api"], outboundTag: "api" },
-          { type: "field", ip: ["geoip:private"], outboundTag: "blocked" },
-          { type: "field", protocol: ["bittorrent"], outboundTag: "blocked" }
-        ]
-      }),
-      xray_config_policy: JSON.stringify({
-        levels: { "0": { statsUserUplink: true, statsUserDownlink: true } },
-        system: { statsInboundUplink: true, statsInboundDownlink: true }
-      }),
-      block_bittorrent: 'true',
-      block_private_ips: 'true',
-      block_ads: 'false',
-    };
-    for (const [key, value] of Object.entries(defaults)) {
-      const existing = await settingsService.getSetting(key);
-      if (!existing) await settingsService.updateSetting(key, value);
-    }
+    // Skip Master-only initialization if in Slave mode
+    if (!isSlave) {
+        const defaults = {
+          xray_binary: process.platform === 'win32' ? 'xray.exe' : '/usr/local/bin/xray',
+          xray_config_path: path.join(process.cwd(), 'xray_config.json'),
+          panel_port: '4000',
+          xray_config_log: JSON.stringify({ loglevel: "warning" }),
+          xray_config_dns: JSON.stringify({ servers: ["1.1.1.1", "8.8.8.8"] }),
+          xray_config_outbounds: JSON.stringify([
+            { protocol: "freedom", tag: "direct", settings: { domainStrategy: "AsIs" } },
+            { protocol: "blackhole", tag: "blocked" }
+          ]),
+          xray_config_routing: JSON.stringify({
+            domainStrategy: "AsIs",
+            rules: [
+              { type: "field", inboundTag: ["api"], outboundTag: "api" },
+              { type: "field", ip: ["geoip:private"], outboundTag: "blocked" },
+              { type: "field", protocol: ["bittorrent"], outboundTag: "blocked" }
+            ]
+          }),
+          xray_config_policy: JSON.stringify({
+            levels: { "0": { statsUserUplink: true, statsUserDownlink: true } },
+            system: { statsInboundUplink: true, statsInboundDownlink: true }
+          }),
+          block_bittorrent: 'true',
+          block_private_ips: 'true',
+          block_ads: 'false',
+        };
+        for (const [key, value] of Object.entries(defaults)) {
+          const existing = await settingsService.getSetting(key);
+          if (!existing) await settingsService.updateSetting(key, value);
+        }
 
-    await xray.start();
-
-    // Start Slave Service if enabled
-    const slave = SlaveService.getInstance();
-    if (slave.isEnabled()) {
-        await slave.start();
-    } else {
-        // Master only tasks
+        await xray.start();
         StatsService.startPolling(5000); // 5 sec interval
+    } else {
+        await slave.start();
     }
     
     console.log(`VGate Server started on http://localhost:${PORT}`);
   } catch (err) {
-    fastify.log.error(err);
+    if (fastify) {
+      fastify.log.error(err);
+    } else {
+      console.error('Fatal Server Error during startup:', err);
+    }
     process.exit(1);
   }
 }

@@ -17,6 +17,7 @@ export class SettingsService {
   }
 
   public async getSetting(key: string, defaultValue?: string): Promise<string | undefined> {
+    if (process.env.NODE_API_KEY) return defaultValue; // Slave mode: use defaults
     const result = await db.select().from(settings).where(eq(settings.key, key)).get();
     return result ? result.value : defaultValue;
   }
