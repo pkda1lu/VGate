@@ -19,8 +19,8 @@ export class XrayService {
     return XrayService.instance;
   }
 
-  public async generateConfig() {
-    const inboundsData = await db.query.inbounds.findMany({
+  public async generateConfig(externalInbounds?: any[]) {
+    const inboundsData = externalInbounds || await db.query.inbounds.findMany({
       with: {
         clients: true
       }
@@ -125,8 +125,8 @@ export class XrayService {
     return configPath!;
   }
 
-  public async start() {
-    const configPath = await this.generateConfig();
+  public async start(externalInbounds?: any[]) {
+    const configPath = await this.generateConfig(externalInbounds);
     this.stop();
 
     const settingsService = SettingsService.getInstance();

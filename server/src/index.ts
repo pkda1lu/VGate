@@ -4,6 +4,7 @@ import fastifyStatic from '@fastify/static';
 import path from 'path';
 import { XrayService } from './services/XrayService';
 import { StatsService } from './services/StatsService';
+import { SlaveService } from './services/SlaveService';
 import { db } from './db';
 import { eq } from 'drizzle-orm';
 import inboundRoutes from './routes/inbound';
@@ -127,8 +128,14 @@ async function start() {
 
     await xray.start();
 
-    // Start Traffic Polling
-    StatsService.startPolling(5000); // 5 sec interval
+    // Start Slave Service if enabled
+    const slave = SlaveService.getInstance();
+    if (slave.isEnabled()) {
+        await slave.start();
+    } else {
+        // Master only tasks
+        StatsService.startPolling(5000); // 5 sec interval
+    }
     
     console.log(`VGate Server started on http://localhost:${PORT}`);
   } catch (err) {
