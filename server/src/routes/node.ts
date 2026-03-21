@@ -27,7 +27,7 @@ export default async function nodeRoutes(fastify: FastifyInstance, options: Fast
 
     // Get all inbounds for this node
     const inbounds = await db.query.inbounds.findMany({
-        where: eq(nodeTable.id, node.id),
+        where: (t, { eq }) => eq(t.nodeId, node.id),
         with: { clients: true }
     });
 

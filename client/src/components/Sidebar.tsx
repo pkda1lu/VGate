@@ -71,14 +71,17 @@ export default function Sidebar() {
       </nav>
 
       <div className="p-4 mt-auto border-t border-white/5 bg-white/[0.01]">
-         <div className="bg-white/[0.03] rounded-2xl p-4 border border-white/5 group hover:border-primary/20 transition-colors cursor-pointer">
+         <div 
+           onClick={() => navigate('/nodes')}
+           className="bg-white/[0.03] rounded-2xl p-4 border border-white/5 group hover:border-emerald-500/50 transition-all cursor-pointer hover:bg-emerald-500/[0.02]"
+         >
             <div className="flex items-center gap-3">
-               <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-400">
+               <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-400 group-hover:scale-110 transition-transform">
                  <Globe className="w-4 h-4" />
                </div>
                <div className="flex flex-col flex-1 truncate">
-                  <span className="text-xs font-bold truncate">Server Node #1</span>
-                  <span className="text-[10px] text-muted-foreground">DE-FRA-01 (Online)</span>
+                  <span className="text-xs font-bold truncate">Server Cluster</span>
+                  <span className="text-[10px] text-muted-foreground">Active Nodes Manage</span>
                </div>
             </div>
          </div>
