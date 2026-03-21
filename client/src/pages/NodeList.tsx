@@ -16,6 +16,7 @@ import Modal from '../components/Modal';
 export default function NodeList() {
   const { data: nodes, mutate } = useSWR('/nodes', fetcher);
   const [showModal, setShowModal] = useState(false);
+  const [editingNode, setEditingNode] = useState<any>(null);
   const [copiedKey, setCopiedKey] = useState<number | null>(null);
   const [formData, setFormData] = useState({
     name: '',
@@ -24,8 +25,13 @@ export default function NodeList() {
 
   const handleAddNode = async (e: React.FormEvent) => {
     e.preventDefault();
-    await api.post('/nodes', formData);
+    if (editingNode) {
+      await api.put(`/nodes/${editingNode.id}`, formData);
+    } else {
+      await api.post('/nodes', formData);
+    }
     setShowModal(false);
+    setEditingNode(null);
     setFormData({ name: '', address: '' });
     mutate();
   };
@@ -158,7 +164,14 @@ export default function NodeList() {
                           <Trash2 className="w-4 h-4" />
                         </button>
                       )}
-                      <button className="p-3 rounded-xl hover:bg-white/10 text-muted-foreground transition-all">
+                      <button 
+                        onClick={() => {
+                          setEditingNode(node);
+                          setFormData({ name: node.name, address: node.address });
+                          setShowModal(true);
+                        }}
+                        className="p-3 rounded-xl hover:bg-white/10 text-muted-foreground transition-all"
+                      >
                         <ChevronRight className="w-4 h-4" />
                       </button>
                    </div>
@@ -211,8 +224,12 @@ export default function NodeList() {
 
       <Modal 
         isOpen={showModal} 
-        onClose={() => setShowModal(false)}
-        title="Добавить серверную ноду"
+        onClose={() => {
+          setShowModal(false);
+          setEditingNode(null);
+          setFormData({ name: '', address: '' });
+        }}
+        title={editingNode ? "Редактировать ноду" : "Добавить серверную ноду"}
       >
         <form onSubmit={handleAddNode} className="space-y-4">
           <div className="space-y-1">
@@ -247,7 +264,7 @@ export default function NodeList() {
             type="submit"
             className="w-full bg-primary text-white h-12 rounded-2xl font-bold mt-6 shadow-lg shadow-primary/20 hover:scale-[1.02] transition-all"
           >
-            Создать ноду
+            {editingNode ? "Сохранить изменения" : "Создать ноду"}
           </button>
         </form>
       </Modal>

@@ -58,6 +58,19 @@ export default async function nodeRoutes(fastify: FastifyInstance, options: Fast
     await db.delete(nodeTable).where(eq(nodeTable.id, parseInt(id)));
     return { success: true };
   });
+  
+  // Update Node
+  fastify.put('/:id', async (request, reply) => {
+    const { id } = request.params as any;
+    const body = request.body as any;
+    
+    await db.update(nodeTable).set({
+        name: body.name,
+        address: body.address
+    }).where(eq(nodeTable.id, parseInt(id)));
+    
+    return { success: true };
+  });
 
   // Report Node Traffic
   fastify.post('/report', async (request, reply) => {
