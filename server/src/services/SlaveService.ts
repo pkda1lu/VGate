@@ -1,4 +1,5 @@
 import axios from 'axios';
+import https from 'https';
 import { XrayService } from './XrayService';
 import { SettingsService } from './SettingsService';
 
@@ -8,9 +9,14 @@ export class SlaveService {
     private masterUrl: string | null = null;
     private apiKey: string | null = null;
     private lastConfigHash: string = '';
+    private axiosInstance = axios.create({
+        httpsAgent: new https.Agent({  
+            rejectUnauthorized: false
+        })
+    });
 
     private constructor() {
-        this.masterUrl = process.env.MASTER_URL || null;
+        this.masterUrl = (process.env.MASTER_URL || '').replace(/\/+$/, '') || null;
         this.apiKey = process.env.NODE_API_KEY || null;
     }
 
@@ -39,7 +45,7 @@ export class SlaveService {
 
     private async sync() {
         try {
-            const response = await axios.get(`${this.masterUrl}/api/nodes/me`, {
+            const response = await this.axiosInstance.get(`${this.masterUrl}/api/nodes/me`, {
                 params: { apiKey: this.apiKey }
             });
 
@@ -55,7 +61,7 @@ export class SlaveService {
                 await xray.start(inbounds);
             } else {
                 // Just report health
-                await axios.post(`${this.masterUrl}/api/nodes/report`, {
+                await this.axiosInstance.post(`${this.masterUrl}/api/nodes/report`, {
                     apiKey: this.apiKey,
                     status: 'online'
                 }).catch(() => {});

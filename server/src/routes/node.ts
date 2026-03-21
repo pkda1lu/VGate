@@ -26,12 +26,12 @@ export default async function nodeRoutes(fastify: FastifyInstance, options: Fast
     await db.update(nodeTable).set({ lastSeen: new Date(), status: 'online' }).where(eq(nodeTable.id, node.id));
 
     // Get all inbounds for this node
-    const inbounds = await db.query.inbounds.findMany({
-        where: (t, { eq }) => eq(t.nodeId, node.id),
+    const inboundsList = await db.query.inbounds.findMany({
+        where: (fields, { eq }) => eq(fields.nodeId, node.id),
         with: { clients: true }
     });
 
-    return { node, inbounds };
+    return { node, inbounds: inboundsList };
   });
 
   // Create Node
