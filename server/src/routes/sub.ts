@@ -37,7 +37,7 @@ export default async function subRoutes(fastify: FastifyInstance, options: Fasti
       if (host === 'localhost' || host === '127.0.0.1') host = masterIp;
 
       return generateProxyUri(inbound, client, host);
-    }).filter(Boolean);
+    }).filter(Boolean) as string[];
 
     // Detect browser vs client
     const acceptHeader = request.headers.accept || '';
@@ -94,7 +94,7 @@ export default async function subRoutes(fastify: FastifyInstance, options: Fasti
                         <span class="title">Config #${i+1} - Node: ${clients[i].inbound.node?.name || 'Master'}</span>
                         <div class="flex-row">
                             <div class="qr-box">
-                                <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(link)}" alt="Config QR">
+                                <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(link || '')}" alt="Config QR">
                             </div>
                             <div style="flex: 1;">
                                 <div class="link">${link}</div>
