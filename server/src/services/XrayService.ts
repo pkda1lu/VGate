@@ -44,7 +44,7 @@ export class XrayService {
         } catch(e) {}
       
         // Map clients from our DB
-        settings.clients = inbound.clients.map(client => ({
+        settings.clients = inbound.clients.map((client: any) => ({
           id: client.uuid,
           email: client.email,
           flow: client.flow === 'none' || !client.flow ? undefined : client.flow,
