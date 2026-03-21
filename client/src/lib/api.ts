@@ -53,4 +53,7 @@ export const setupAdmin = (data: any) => api.post('/auth/setup', data);
 export const login = (data: any) => api.post('/auth/login', data);
 export const logout = () => api.post('/auth/logout');
 
+export const fetcher = (url: string) => api.get(url).then(res => res.data);
+export { api };
 export default api;
+

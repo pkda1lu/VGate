@@ -1,7 +1,6 @@
 import { 
   Plus, 
   Trash2, 
-  Copy, 
   RefreshCcw, 
   QrCode,
   Clock,
@@ -10,7 +9,9 @@ import {
   Loader2,
   AlertCircle,
   Users,
-  Settings
+  Settings,
+  Rss,
+  Link2
 } from 'lucide-react';
 import useSWR from 'swr';
 import { useState } from 'react';
@@ -38,7 +39,8 @@ export default function ClientList() {
     flow: 'none',
     totalGb: 0,
     enabled: true,
-    expiry: ''
+    expiry: '',
+    subId: '',
   });
 
   const openCreateModal = () => {
@@ -50,7 +52,8 @@ export default function ClientList() {
       flow: 'xtls-rprx-vision',
       totalGb: 0,
       enabled: true,
-      expiry: ''
+      expiry: '',
+      subId: crypto.randomUUID(),
     });
     setShowModal(true);
   };
@@ -64,7 +67,8 @@ export default function ClientList() {
       flow: client.flow || 'none',
       totalGb: client.totalGb || 0,
       enabled: client.enabled,
-      expiry: client.expiry ? new Date(client.expiry).toISOString().slice(0, 16) : ''
+      expiry: client.expiry ? new Date(client.expiry).toISOString().slice(0, 16) : '',
+      subId: client.subId || crypto.randomUUID(),
     });
     setShowModal(true);
   };
@@ -93,6 +97,18 @@ export default function ClientList() {
     }
   };
 
+  const handleCopySubLink = (client: any) => {
+    const subId = client.subId || '';
+    if (!subId) return alert('No subscription ID found for this client');
+    
+    const panelDomain = (settings?.server_ip) || window.location.hostname;
+    const protocol = window.location.protocol;
+    const subUrl = `${protocol}//${panelDomain}/api/sub/${subId}`;
+    
+    navigator.clipboard.writeText(subUrl);
+    alert('Subscription link copied to clipboard!');
+  };
+
   const getTrafficPercentage = (usage: number, limit: number) => {
     if (!limit || limit === 0) return 0;
     return Math.min((usage / limit) * 100, 100);
@@ -110,23 +126,40 @@ export default function ClientList() {
     const uuid = client.uuid;
     const tag = encodeURIComponent(client.email);
 
-    if (inbound.protocol === 'vless') {
+    const safeBase64 = (str: string) => {
+        try {
+            return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, (_match, p1) => String.fromCharCode(parseInt(p1, 16))));
+        } catch (e) {
+            return btoa(str);
+        }
+    };
+
+    if (inbound.protocol === 'vless' || inbound.protocol === 'trojan') {
       let stream;
       try { stream = JSON.parse(inbound.stream); } catch(e) { stream = {}; }
       
       const security = stream.security || 'none';
       const type = stream.network || 'tcp';
       
-      let url = `vless://${uuid}@${host}:${port}?type=${type}&security=${security}&encryption=none`;
+      let url = `${inbound.protocol}://${uuid}@${host}:${port}?type=${type}&security=${security}&encryption=none`;
+
+      if (type === 'xhttp') {
+        const xpath = stream.xhttpSettings?.path || '/';
+        const xhost = stream.xhttpSettings?.host || '';
+        const xmode = stream.xhttpSettings?.mode || 'auto';
+        url += `&path=${encodeURIComponent(xpath)}&mode=${xmode}`;
+        if (xhost) url += `&host=${encodeURIComponent(xhost)}`;
+      }
 
       if (security === 'reality') {
         const pbk = stream.realitySettings?.publicKey || '';
         const sni = stream.realitySettings?.serverNames?.[0] || '';
         const sid = stream.realitySettings?.shortIds?.[0] || '';
         const spx = stream.realitySettings?.spiderX || '/';
-        const fp = 'chrome'; // Chrome has widest client support (server fp is separate)
-        const flow = client.flow && client.flow !== 'none' ? client.flow : 'xtls-rprx-vision';
-        url += `&pbk=${pbk}&sni=${sni}&fp=${fp}&sid=${sid}&spx=${encodeURIComponent(spx)}&flow=${flow}`;
+        const fp = 'chrome';
+        const flow = client.flow && client.flow !== 'none' ? client.flow : (inbound.protocol === 'vless' ? 'xtls-rprx-vision' : '');
+        url += `&pbk=${pbk}&sni=${sni}&fp=${fp}&sid=${sid}&spx=${encodeURIComponent(spx)}`;
+        if (flow) url += `&flow=${flow}`;
       } else if (security === 'tls') {
         const sni = stream.tlsSettings?.serverName || host;
         url += `&sni=${sni}`;
@@ -135,8 +168,39 @@ export default function ClientList() {
       url += `#${tag}`;
       return url;
     }
+
+    if (inbound.protocol === 'vmess') {
+        let stream;
+        try { stream = JSON.parse(inbound.stream); } catch(e) { stream = {}; }
+        const type = stream.network || 'tcp';
+        const security = stream.security || 'none';
+
+        const vmessObj = {
+            v: "2",
+            ps: client.email,
+            add: host,
+            port: port,
+            id: uuid,
+            aid: "0",
+            scy: "auto",
+            net: type,
+            type: "none",
+            host: "",
+            path: "",
+            tls: security === 'none' ? "" : security,
+            sni: security === 'reality' ? (stream.realitySettings?.serverNames?.[0] || '') : (stream.tlsSettings?.serverName || ''),
+            alpn: "",
+            fp: security === 'reality' ? "chrome" : ""
+        };
+
+        if (type === 'xhttp') {
+            vmessObj.path = stream.xhttpSettings?.path || '/';
+            vmessObj.host = stream.xhttpSettings?.host || '';
+        }
+
+        return `vmess://${safeBase64(JSON.stringify(vmessObj))}`;
+    }
     
-    // Fallback for other protocols if needed
     return `Unknown protocol: ${inbound.protocol}`;
   };
 
@@ -231,7 +295,8 @@ export default function ClientList() {
              </div>
 
              <div className="flex gap-2">
-                <IconBtn onClick={() => handleCopyLink(client)} tooltip="Copy Node Link" icon={<Copy className="w-4 h-4" />} />
+                <IconBtn onClick={() => handleCopyLink(client)} tooltip="Copy Node Link" icon={<Link2 className="w-4 h-4" />} />
+                <IconBtn onClick={() => handleCopySubLink(client)} tooltip="Copy Subscription Link" icon={<Rss className="w-4 h-4 text-orange-400" />} color="hover:bg-orange-500/10" />
                 <IconBtn onClick={() => handleShowQr(client)} tooltip="Show QR Code" icon={<QrCode className="w-4 h-4" />} />
                 <IconBtn onClick={() => openEditModal(client)} tooltip="Edit Client" icon={<Settings className="w-4 h-4" />} color="text-sky-400 hover:bg-sky-500/10" />
                 <IconBtn onClick={() => handleDelete(client.id)} tooltip="Delete User" icon={<Trash2 className="w-4 h-4" />} color="text-red-400 hover:bg-red-500/10" />
@@ -293,7 +358,7 @@ export default function ClientList() {
           </div>
 
           <div className="grid grid-cols-[160px_1fr] items-center gap-4 group">
-             <label className="text-sm font-semibold text-right text-muted-foreground group-focus-within:text-foreground">ID</label>
+             <label className="text-sm font-semibold text-right text-muted-foreground group-focus-within:text-foreground">UUID (Xray ID)</label>
              <div className="relative flex items-center">
                <input
                  required
@@ -303,6 +368,22 @@ export default function ClientList() {
                  className="w-full bg-white/[0.03] border border-white/5 rounded-xl h-11 pl-4 pr-12 focus:outline-none focus:border-primary/50 focus:bg-white/[0.05] transition-all text-sm font-mono text-muted-foreground"
                />
                <button type="button" onClick={() => setFormData({...formData, uuid: crypto.randomUUID()})} className="absolute right-3 p-1 hover:text-primary transition-colors text-muted-foreground">
+                  <RefreshCcw className="w-4 h-4" />
+               </button>
+             </div>
+          </div>
+
+          <div className="grid grid-cols-[160px_1fr] items-center gap-4 group">
+             <label className="text-sm font-semibold text-right text-muted-foreground group-focus-within:text-foreground">Subscription ID</label>
+             <div className="relative flex items-center">
+               <input
+                 required
+                 type="text"
+                 value={formData.subId}
+                 onChange={(e) => setFormData({ ...formData, subId: e.target.value })}
+                 className="w-full bg-white/[0.03] border border-white/5 rounded-xl h-11 pl-4 pr-12 focus:outline-none focus:border-orange-500/50 focus:bg-white/[0.05] transition-all text-sm font-mono text-muted-foreground"
+               />
+               <button type="button" onClick={() => setFormData({...formData, subId: crypto.randomUUID()})} className="absolute right-3 p-1 hover:text-orange-500 transition-colors text-muted-foreground">
                   <RefreshCcw className="w-4 h-4" />
                </button>
              </div>

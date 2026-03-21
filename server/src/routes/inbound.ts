@@ -54,6 +54,7 @@ export default async function inboundRoutes(fastify: FastifyInstance, options: F
 
     const [inbound] = await db.insert(inboundTable).values({
       tag: body.tag,
+      nodeId: body.nodeId || 1,
       port: body.port,
       protocol: body.protocol,
       settings: JSON.stringify(body.settings || { clients: [], decryptions: [] }),
@@ -81,6 +82,7 @@ export default async function inboundRoutes(fastify: FastifyInstance, options: F
     await db.update(inboundTable)
       .set({
         tag: body.tag,
+        nodeId: body.nodeId,
         port: body.port,
         protocol: body.protocol,
         settings: JSON.stringify(body.settings),

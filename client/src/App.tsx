@@ -3,6 +3,7 @@ import Sidebar from './components/Sidebar';
 import Dashboard from './pages/Dashboard';
 import InboundList from './pages/InboundList';
 import ClientList from './pages/ClientList';
+import NodeList from './pages/NodeList';
 import Settings from './pages/Settings';
 import Logs from './pages/Logs';
 import Login from './pages/Login';
@@ -45,6 +46,7 @@ function AppContent() {
             
             {/* Protected Routes */}
             <Route path="/" element={isAuthenticated ? <Dashboard /> : <Navigate to="/login" />} />
+            <Route path="/nodes" element={isAuthenticated ? <NodeList /> : <Navigate to="/login" />} />
             <Route path="/inbounds" element={isAuthenticated ? <InboundList /> : <Navigate to="/login" />} />
             <Route path="/clients" element={isAuthenticated ? <ClientList /> : <Navigate to="/login" />} />
             <Route path="/settings" element={isAuthenticated ? <Settings /> : <Navigate to="/login" />} />

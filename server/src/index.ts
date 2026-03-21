@@ -11,6 +11,8 @@ import clientRoutes from './routes/client';
 import settingsRoutes from './routes/settings';
 import systemRoutes from './routes/system';
 import authRoutes from './routes/auth';
+import subRoutes from './routes/sub';
+import nodeRoutes from './routes/node';
 
 import fs from 'fs-extra';
 
@@ -65,10 +67,12 @@ async function start() {
     await fastify.register(settingsRoutes, { prefix: '/api/settings' });
     await fastify.register(systemRoutes, { prefix: '/api/system' });
     await fastify.register(authRoutes, { prefix: '/api/auth' });
+    await fastify.register(subRoutes, { prefix: '/api/sub' });
+    await fastify.register(nodeRoutes, { prefix: '/api/nodes' });
 
     // Auth Middleware
     fastify.addHook('onRequest', async (request: any, reply: any) => {
-        const bypass = ['/api/auth', '/api/settings/xray-config', '/health'];
+        const bypass = ['/api/auth', '/api/sub', '/api/settings/xray-config', '/health'];
         const isBypassed = bypass.some(p => request.url.startsWith(p));
         if (request.url.startsWith('/api') && !isBypassed) {
             const token = request.headers.authorization?.replace('Bearer ', '');

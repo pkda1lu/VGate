@@ -29,6 +29,7 @@ export default async function clientRoutes(fastify: FastifyInstance, options: Fa
     const [client] = await db.insert(clientTable).values({
       id: generateUuid(),
       inboundId: body.inboundId,
+      subId: body.subId || generateUuid(), // ID for grouping in subscription
       email: body.email,
       uuid: uuid,
       flow: body.flow || null,
@@ -53,6 +54,7 @@ export default async function clientRoutes(fastify: FastifyInstance, options: Fa
       .set({
         email: body.email,
         uuid: body.uuid,
+        subId: body.subId,
         flow: body.flow,
         limitIp: body.limitIp,
         totalGb: body.totalGb,

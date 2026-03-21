@@ -12,6 +12,7 @@ import {
 
 const navItems = [
   { path: '/', label: 'Overview', icon: <LayoutDashboard className="w-5 h-5" /> },
+  { path: '/nodes', label: 'Nodes', icon: <Globe className="w-5 h-5" /> },
   { path: '/inbounds', label: 'Inbounds', icon: <Shield className="w-5 h-5" /> },
   { path: '/clients', label: 'Clients', icon: <Users className="w-5 h-5" /> },
   { path: '/logs', label: 'Panel Logs', icon: <Activity className="w-5 h-5" /> },

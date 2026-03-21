@@ -55,6 +55,12 @@ export default function InboundList() {
     httpMasking: false,
     tcpSockopt: false,
 
+    // XHTTP settings
+    xhttpPath: '/',
+    xhttpMode: 'auto',
+    xhttpHost: '',
+    xhttpExtraNoWait: false,
+
     sniffingEnabled: true,
     sniffHttp: true,
     sniffTls: true,
@@ -94,6 +100,10 @@ export default function InboundList() {
       sniffFakedns: true,
       metadataOnly: false,
       routeOnly: false,
+      xhttpPath: '/',
+      xhttpMode: 'auto',
+      xhttpHost: '',
+      xhttpExtraNoWait: false,
     });
     setShowModal(true);
   };
@@ -141,6 +151,11 @@ export default function InboundList() {
       sniffFakedns: sniffEnv.destOverride?.includes('fakedns') || false,
       metadataOnly: sniffEnv.metadataOnly || false,
       routeOnly: sniffEnv.routeOnly || false,
+
+      xhttpPath: stream.xhttpSettings?.path || '/',
+      xhttpMode: stream.xhttpSettings?.mode || 'auto',
+      xhttpHost: stream.xhttpSettings?.host || '',
+      xhttpExtraNoWait: stream.xhttpSettings?.extra?.noWait || false,
     });
     setShowModal(true);
   };
@@ -200,6 +215,17 @@ export default function InboundList() {
           sockopt: {
             tcpFastOpen: true,
             tproxy: "passive"
+          }
+        } : {}),
+
+        ...(formData.network === 'xhttp' ? {
+          xhttpSettings: {
+            path: formData.xhttpPath,
+            mode: formData.xhttpMode,
+            host: formData.xhttpHost,
+            extra: {
+              noWait: formData.xhttpExtraNoWait
+            }
           }
         } : {}),
 
@@ -401,6 +427,7 @@ export default function InboundList() {
                     <option value="ws" className="bg-background">WebSocket (ws)</option>
                     <option value="grpc" className="bg-background">gRPC</option>
                     <option value="httpupgrade" className="bg-background">HTTPUpgrade</option>
+                    <option value="xhttp" className="bg-background">XHTTP</option>
                   </select>
                 </div>
                 
@@ -475,6 +502,53 @@ export default function InboundList() {
                   </div>
                 )}
               </div>
+
+              {/* XHTTP Settings */}
+              {formData.network === 'xhttp' && (
+                <div className="border border-white/5 bg-white/[0.01] rounded-2xl mt-4 overflow-hidden border-orange-500/20">
+                  <div className="p-4 bg-orange-500/5 border-b border-white/5 flex items-center gap-3">
+                    <Zap className="w-4 h-4 text-orange-400" />
+                    <span className="font-bold text-sm text-orange-400 uppercase tracking-widest leading-none mt-0.5">XHTTP Transport</span>
+                  </div>
+                  <div className="p-4 space-y-4">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Path</label>
+                      <input 
+                        value={formData.xhttpPath} 
+                        onChange={(e) => setFormData({...formData, xhttpPath: e.target.value})} 
+                        className="w-full bg-white/[0.03] border border-white/5 rounded-xl h-10 px-3 focus:outline-none focus:border-orange-500/50 text-sm"
+                        placeholder="/"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Host (Optional)</label>
+                      <input 
+                        value={formData.xhttpHost} 
+                        onChange={(e) => setFormData({...formData, xhttpHost: e.target.value})} 
+                        className="w-full bg-white/[0.03] border border-white/5 rounded-xl h-10 px-3 focus:outline-none focus:border-orange-500/50 text-sm"
+                        placeholder="yourdomain.com"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Mode</label>
+                        <select 
+                          value={formData.xhttpMode} 
+                          onChange={(e) => setFormData({...formData, xhttpMode: e.target.value})} 
+                          className="w-full bg-white/[0.03] border border-white/5 rounded-xl h-10 px-3 focus:outline-none focus:border-orange-500/50 text-sm appearance-none"
+                        >
+                          <option value="auto">Auto</option>
+                          <option value="packet">Packet</option>
+                          <option value="stream">Stream</option>
+                        </select>
+                      </div>
+                      <div className="flex items-end pb-1">
+                        <Toggle checked={formData.xhttpExtraNoWait} onChange={(v) => setFormData({...formData, xhttpExtraNoWait: v})} label="NoWait" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Right Column: Advanced Reality or TLS */}
