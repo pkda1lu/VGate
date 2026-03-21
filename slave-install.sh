@@ -49,9 +49,7 @@ mkdir -p /etc/vgate
 cd /etc/vgate
 
 # Clone or download the gate software
-# Since it's a private repo usually, we'd need a token or we can use the main zip
-# For now, we assume we want to pull the same code as the panel
-git clone https://github.com/anotroot/VGate.git . || echo "Using existing files..."
+git clone https://github.com/pkda1lu/VGate.git . || echo "Using existing files..."
 
 echo -e "${GREEN}[3/4]${NC} Building Service..."
 cd server
