@@ -72,12 +72,14 @@ async function start() {
     });
 
     // --- Routes ---
+    console.log(`[BOOT] Loading subscription settings...`);
     const subPathSetting = settingsService ? await settingsService.getSetting('sub_path', '/api/sub') : '/api/sub';
     // Clean subPathSetting for prefix (must not end with / unless it is just /)
     const cleanSubPrefix = subPathSetting.length > 1 && subPathSetting.endsWith('/') 
         ? subPathSetting.slice(0, -1) 
         : subPathSetting;
 
+    console.log(`[BOOT] Registering routes (Sub path: ${cleanSubPrefix})...`);
     await fastify.register(inboundRoutes, { prefix: '/api/inbounds' });
     await fastify.register(clientRoutes, { prefix: '/api/clients' });
     await fastify.register(settingsRoutes, { prefix: '/api/settings' });
@@ -85,12 +87,12 @@ async function start() {
     await fastify.register(authRoutes, { prefix: '/api/auth' });
     await fastify.register(subRoutes, { prefix: cleanSubPrefix });
     // Also register at /api/sub for compatibility if different
-    if (cleanSubPrefix !== '/api/sub') {
+    if (cleanSubPrefix !== '/api/sub' && cleanSubPrefix !== '/api/sub/') {
         await fastify.register(subRoutes, { prefix: '/api/sub' });
     }
     await fastify.register(nodeRoutes, { prefix: '/api/nodes' });
 
-    // Auth Middleware
+    console.log(`[BOOT] Initializing Auth Middleware...`);
     fastify.addHook('onRequest', async (request: any, reply: any) => {
         const bypass = [
             '/api/auth', 
@@ -123,13 +125,34 @@ async function start() {
     const PORT = process.env.PORT ? parseInt(process.env.PORT) : 4000;
     const ADDRESS = '0.0.0.0';
 
+    console.log(`[BOOT] Attempting to listen on ${ADDRESS}:${PORT}...`);
     await fastify.listen({ port: PORT, host: ADDRESS });
+
+    // --- Dedicated Subscription Listener ---
+    const subPort = settingsService ? await settingsService.getSetting('sub_port') : null;
+    if (subPort && parseInt(subPort) !== PORT) {
+        console.log(`[BOOT] Starting dedicated subscription server on port ${subPort}...`);
+        const subServer = Fastify({
+            https: httpsOptions,
+            logger: false // Keep logs clean
+        });
+        await subServer.register(cors);
+        await subServer.register(subRoutes, { prefix: cleanSubPrefix });
+        // Also register at root for sub if it doesn't take the whole path
+        if (cleanSubPrefix !== '/') {
+            await subServer.register(subRoutes, { prefix: '/' });
+        }
+        subServer.listen({ port: parseInt(subPort), host: ADDRESS }).catch(err => {
+            console.error(`[ERROR] Failed to start sub server on ${subPort}:`, err.message);
+        });
+    }
     
     // Start Xray
     const xray = XrayService.getInstance();
     
     // Skip Master-only initialization if in Slave mode
     if (!isSlave) {
+        console.log(`[BOOT] Master-mode: sync default settings...`);
         const defaults = {
           xray_binary: process.platform === 'win32' ? 'xray.exe' : '/usr/local/bin/xray',
           xray_config_path: path.join(process.cwd(), 'xray_config.json'),
@@ -161,18 +184,19 @@ async function start() {
           if (!existing) await settingsService.updateSetting(key, value);
         }
 
+        console.log(`[BOOT] Master-mode: starting core services...`);
         await xray.start();
         StatsService.startPolling(5000); // 5 sec interval
     } else {
+        console.log(`[BOOT] Slave-mode: initial sync...`);
         await slave.start();
     }
     
-    console.log(`VGate Server started on http://localhost:${PORT}`);
-  } catch (err) {
+    console.log(`[VGATE SUCCESS] Panel is live on port ${PORT}`);
+  } catch (err: any) {
+    console.error(`\n[FATAL CRASH] Server failed to start:`, err.message);
     if (fastify) {
       fastify.log.error(err);
-    } else {
-      console.error('Fatal Server Error during startup:', err);
     }
     process.exit(1);
   }

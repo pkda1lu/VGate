@@ -25,9 +25,12 @@ export default async function nodeRoutes(fastify: FastifyInstance, options: Fast
     // Update last seen
     await db.update(nodeTable).set({ lastSeen: new Date(), status: 'online' }).where(eq(nodeTable.id, node.id));
 
-    // Get all inbounds for this node
+    // Get all inbounds for this node PLUS all global inbounds from Master
     const inboundsList = await db.query.inbounds.findMany({
-        where: (fields, { eq }) => eq(fields.nodeId, node.id),
+        where: (fields, { eq, or, and }) => or(
+            eq(fields.nodeId, node.id),
+            and(eq(fields.nodeId, 1), eq(fields.isGlobal, true))
+        ),
         with: { clients: true }
     });
 

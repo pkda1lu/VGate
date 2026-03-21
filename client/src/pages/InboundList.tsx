@@ -13,12 +13,13 @@ import {
 } from 'lucide-react';
 import useSWR from 'swr';
 import { useState } from 'react';
-import { getInbounds, deleteInbound, createInbound, updateInbound, getRealityKeys } from '../lib/api';
+import { getInbounds, deleteInbound, createInbound, updateInbound, getRealityKeys, api } from '../lib/api';
 import Modal from '../components/Modal';
 import Toggle from '../components/Toggle';
 
 export default function InboundList() {
   const { data: inbounds, error, isLoading, mutate } = useSWR('/inbounds', () => getInbounds().then(res => res.data));
+  const { data: nodes } = useSWR('/nodes', () => api.get('/nodes').then(res => res.data));
   const [showModal, setShowModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingInbound, setEditingInbound] = useState<any>(null);
@@ -34,7 +35,9 @@ export default function InboundList() {
     protocol: 'vless',
     network: 'tcp',
     security: 'reality',
-
+    isGlobal: false,
+    nodeId: 1,
+    
     realityDest: 'google.com:443',
     realityServerNames: 'google.com, www.google.com',
     realityPrivateKey: '',
@@ -78,6 +81,8 @@ export default function InboundList() {
       protocol: 'vless',
       network: 'tcp',
       security: 'reality',
+      isGlobal: false,
+      nodeId: 1,
       realityDest: 'google.com:443',
       realityServerNames: 'google.com, www.google.com',
       realityPrivateKey: '',
@@ -121,10 +126,12 @@ export default function InboundList() {
 
     setFormData({
       tag: inb.tag,
+      nodeId: inb.nodeId || 1,
       port: inb.port,
       protocol: inb.protocol,
       network: stream.network || 'tcp',
       security: stream.security || 'none',
+      isGlobal: inb.isGlobal === 1 || inb.isGlobal === true,
 
       realityDest: rs.dest || 'google.com:443',
       realityServerNames: Array.isArray(rs.serverNames) ? rs.serverNames.join(', ') : 'google.com',
@@ -196,6 +203,7 @@ export default function InboundList() {
       tag: formData.tag,
       port: formData.port,
       protocol: formData.protocol,
+      isGlobal: formData.isGlobal,
       stream: {
         network: formData.network,
         security: formData.security,
@@ -324,6 +332,9 @@ export default function InboundList() {
                     <div className="flex flex-col gap-0.5">
                       <span className="font-bold flex items-center gap-1.5">
                         <Tag className="w-3.5 h-3.5 text-muted-foreground" /> {inbound.tag}
+                        {inbound.isGlobal && (
+                          <span className="bg-emerald-500/10 text-emerald-400 text-[10px] px-2 py-0.5 rounded-full border border-emerald-500/20 font-bold ml-2">GLOBAL</span>
+                        )}
                       </span>
                       <span className="text-xs font-mono text-muted-foreground">Port: {inbound.port}</span>
                     </div>
@@ -379,15 +390,30 @@ export default function InboundList() {
             {/* Left Column: Basic Settings */}
             <div className="space-y-4">
               <h3 className="text-sm font-black uppercase tracking-widest text-primary border-b border-primary/20 pb-2 mb-4">Основные</h3>
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Примечание (Tag)</label>
-                <input
-                  required
-                  value={formData.tag}
-                  onChange={(e) => setFormData({ ...formData, tag: e.target.value })}
-                  placeholder="e.g. vless-reality-main"
-                  className="w-full bg-white/[0.03] border border-white/5 rounded-xl h-11 px-4 focus:outline-none focus:border-primary/50 focus:bg-white/[0.05] transition-all text-sm block"
-                />
+              <div className="grid grid-cols-2 gap-4">
+                 <div className="space-y-1">
+                    <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Родительская Нода</label>
+                    <select
+                      value={formData.nodeId}
+                      onChange={(e) => setFormData({ ...formData, nodeId: parseInt(e.target.value) })}
+                      disabled={formData.isGlobal}
+                      className="w-full bg-white/[0.03] border border-white/5 rounded-xl h-11 px-4 focus:outline-none focus:border-primary/50 focus:bg-white/[0.05] transition-all text-sm appearance-none block disabled:opacity-50"
+                    >
+                      {nodes?.map((node: any) => (
+                        <option key={node.id} value={node.id} className="bg-background">{node.name} {node.id === 1 ? '(Master)' : ''}</option>
+                      ))}
+                    </select>
+                 </div>
+                 <div className="space-y-1">
+                    <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Примечание (Tag)</label>
+                    <input
+                      required
+                      value={formData.tag}
+                      onChange={(e) => setFormData({ ...formData, tag: e.target.value })}
+                      placeholder="e.g. vless-main"
+                      className="w-full bg-white/[0.03] border border-white/5 rounded-xl h-11 px-4 focus:outline-none focus:border-primary/50 focus:bg-white/[0.05] transition-all text-sm block"
+                    />
+                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -443,6 +469,14 @@ export default function InboundList() {
                     <option value="reality" className="bg-background">Reality</option>
                   </select>
                 </div>
+              </div>
+
+              <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-2xl p-4 flex items-center justify-between group">
+                <div className="space-y-1">
+                  <h4 className="text-sm font-bold text-emerald-400">Global Sync</h4>
+                  <p className="text-[10px] text-muted-foreground">Replicate this inbound & all its clients to ALL nodes</p>
+                </div>
+                <Toggle checked={formData.isGlobal} onChange={(v) => setFormData({...formData, isGlobal: v})} />
               </div>
               
               <div className="border border-white/5 bg-white/[0.01] rounded-2xl mt-4 overflow-hidden transition-all">

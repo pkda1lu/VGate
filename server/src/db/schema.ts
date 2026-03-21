@@ -25,6 +25,7 @@ export const inbounds = sqliteTable('inbounds', {
   settings: text('settings').notNull(), // JSON
   sniffing: text('sniffing').notNull(), // JSON
   stream: text('stream').notNull(), // JSON
+  isGlobal: integer('is_global', { mode: 'boolean' }).default(false),
   createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
 });

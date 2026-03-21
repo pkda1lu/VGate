@@ -30,6 +30,7 @@ fi
 echo -e "${GREEN}[2/5]${NC} Pre-migration check (SQlite3)..."
 # Safely add columns if missing for existing installations
 sqlite3 server/data.db "ALTER TABLE inbounds ADD COLUMN node_id INTEGER DEFAULT 1;" 2>/dev/null || true
+sqlite3 server/data.db "ALTER TABLE inbounds ADD COLUMN is_global BOOLEAN DEFAULT 0;" 2>/dev/null || true
 sqlite3 server/data.db "ALTER TABLE clients ADD COLUMN sub_id TEXT;" 2>/dev/null || true
 sqlite3 server/data.db "UPDATE clients SET sub_id = uuid WHERE sub_id IS NULL OR sub_id = '';" 2>/dev/null || true
 sqlite3 server/data.db "CREATE TABLE IF NOT EXISTS nodes (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, address TEXT NOT NULL, api_key TEXT NOT NULL, status TEXT DEFAULT 'offline', last_seen INTEGER, is_master BOOLEAN DEFAULT 0, created_at INTEGER);" 2>/dev/null || true
