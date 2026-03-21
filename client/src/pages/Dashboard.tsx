@@ -20,6 +20,7 @@ import {
 } from 'recharts';
 import useSWR from 'swr';
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { getInbounds, getClients, getSystemMetrics } from '../lib/api';
 
 const formatBytes = (bytes: number) => {
@@ -47,6 +48,7 @@ const generateInitialData = () => {
 };
 
 export default function Dashboard() {
+  const navigate = useNavigate();
   const { data: inbounds, isLoading: loadingInbounds } = useSWR('/inbounds', () => getInbounds().then(res => res.data));
   const { data: clients, isLoading: loadingClients } = useSWR('/clients', () => getClients().then(res => res.data));
   const { data: metrics, isLoading: loadingMetrics } = useSWR('/system/metrics', () => getSystemMetrics().then(res => res.data), { refreshInterval: 5000 });
@@ -129,6 +131,7 @@ export default function Dashboard() {
           sub={`${totalInbounds} Total Configurations`}
           icon={<Server className="w-5 h-5 text-sky-500" />} 
           trend="neutral"
+          onClick={() => navigate('/nodes')}
         />
         <StatCard 
           title="Data Transferred" 
@@ -271,11 +274,12 @@ export default function Dashboard() {
   );
 }
 
-function StatCard({ title, value, sub, icon, trend }: any) {
+function StatCard({ title, value, sub, icon, trend, onClick }: any) {
   return (
     <motion.div 
       whileHover={{ scale: 1.02, translateY: -2 }}
-      className="glass p-5 rounded-3xl glow group transition-all cursor-default border-white/5 hover:border-primary/20 shadow-xl shadow-background/50 relative overflow-hidden"
+      onClick={onClick}
+      className={`glass p-5 rounded-3xl glow group transition-all border-white/5 hover:border-primary/20 shadow-xl shadow-background/50 relative overflow-hidden ${onClick ? 'cursor-pointer' : 'cursor-default'}`}
     >
       <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-125 group-hover:-rotate-12 transition-transform duration-500 pointer-events-none">
          {icon}
