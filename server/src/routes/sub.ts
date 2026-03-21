@@ -55,10 +55,13 @@ export default async function subRoutes(fastify: FastifyInstance, options: Fasti
                 .config { background: #18181b; border: 1px solid #27272a; padding: 15px; border-radius: 12px; margin-bottom: 
                 15px; }
                 .title { font-weight: bold; color: #8b5cf6; margin-bottom: 10px; display: block; }
-                .link { word-break: break-all; font-size: 12px; color: #a1a1aa; font-family: monospace; }
-                .btn { display: inline-block; background: #8b5cf6; color: white; padding: 5px 10px; border-radius: 6px; 
-                text-decoration: none; font-size: 12px; margin-top: 10px; cursor: pointer; border: none; }
+                .link { word-break: break-all; font-size: 12px; color: #a1a1aa; font-family: monospace; margin-bottom: 15px; display: block; }
+                .qr-box { background: white; padding: 10px; border-radius: 8px; display: inline-block; margin: 10px 0; }
+                .qr-box img { width: 120px; height: 120px; display: block; }
+                .btn { display: inline-block; background: #8b5cf6; color: white; padding: 10px 20px; border-radius: 8px; 
+                text-decoration: none; font-size: 14px; font-weight: bold; cursor: pointer; border: none; margin-right: 10px; }
                 h1 { border-bottom: 2px solid #8b5cf6; padding-bottom: 10px; }
+                .flex-row { display: flex; align-items: flex-start; gap: 20px; flex-wrap: wrap; }
             </style>
             <script>
                 function copy(text) {
@@ -69,19 +72,35 @@ export default async function subRoutes(fastify: FastifyInstance, options: Fasti
         </head>
         <body>
             <div class="container">
-                <h1>VGate Configuration Dashboard</h1>
-                <p>Add this URL to your VLESS/V2Ray client for automatic updates:</p>
+                <h1>VGate Subscription Dashboard</h1>
+                <p>Scan the QR below or add this URL to your client for automatic updates:</p>
+                
                 <div class="config" style="background: #1e1b4b; border-color: #312e81;">
                     <span class="title">Your Subscription Link</span>
-                    <div class="link">${request.protocol}://${request.hostname}${request.url}</div>
+                    <div class="flex-row">
+                        <div class="qr-box">
+                            <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`${request.protocol || 'http'}://${request.hostname}${request.url}`)}" alt="Sub QR">
+                        </div>
+                        <div style="flex: 1;">
+                            <div class="link">${request.protocol}://${request.hostname}${request.url}</div>
+                            <button class="btn" onclick="copy('${`${request.protocol || 'http'}://${request.hostname}${request.url}`}')">Copy Sub Link</button>
+                        </div>
+                    </div>
                 </div>
                 
                 <h2>Individual Configurations:</h2>
                 ${links.map((link, i) => `
                     <div class="config">
                         <span class="title">Config #${i+1} - Node: ${clients[i].inbound.node?.name || 'Master'}</span>
-                        <div class="link">${link}</div>
-                        <button class="btn" onclick="copy('${link}')">Copy Link</button>
+                        <div class="flex-row">
+                            <div class="qr-box">
+                                <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(link)}" alt="Config QR">
+                            </div>
+                            <div style="flex: 1;">
+                                <div class="link">${link}</div>
+                                <button class="btn" onclick="copy('${link}')">Copy Config Link</button>
+                            </div>
+                        </div>
                     </div>
                 `).join('')}
             </div>

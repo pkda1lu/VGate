@@ -30,7 +30,7 @@ export default function ClientList() {
 
   // QR Modal State
   const [qrModalOpen, setQrModalOpen] = useState(false);
-  const [qrLink, setQrLink] = useState('');
+  const [qrData, setQrData] = useState({ link: '', sub: '' });
 
   const [formData, setFormData] = useState({
     inboundId: '',
@@ -214,8 +214,15 @@ export default function ClientList() {
 
   const handleShowQr = (client: any) => {
     const link = generateShareLink(client);
+    const subId = client.subId || '';
+    
+    // Correctly construct panel URL for sub
+    const panelDomain = (settings?.server_ip) || window.location.host;
+    const protocol = window.location.protocol;
+    const subUrl = `${protocol}//${panelDomain}/api/sub/${subId}`;
+
     if (link) {
-      setQrLink(link);
+      setQrData({ link, sub: subUrl });
       setQrModalOpen(true);
     }
   };
@@ -448,32 +455,57 @@ export default function ClientList() {
         </form>
       </Modal>
 
-      <Modal isOpen={qrModalOpen} onClose={() => setQrModalOpen(false)} title="Client QR Code" size="md">
-        <div className="flex flex-col items-center justify-center p-8 space-y-6">
-           <div className="bg-white p-4 rounded-2xl shadow-2xl">
-              <img 
-                src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(qrLink)}`} 
-                alt="Client QR Code"
-                className="w-[200px] h-[200px]"
+      <Modal isOpen={qrModalOpen} onClose={() => setQrModalOpen(false)} title="Client Connection QR" size="2xl">
+        <div className="flex flex-col md:flex-row gap-8 p-8 items-start justify-center">
+           {/* Direct Link QR */}
+           <div className="flex-1 flex flex-col items-center gap-4">
+              <span className="text-xs font-black uppercase tracking-widest text-primary">Direct Node Link</span>
+              <div className="bg-white p-3 rounded-2xl shadow-xl">
+                 <img 
+                   src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(qrData.link)}`} 
+                   alt="Direct QR"
+                   className="w-[180px] h-[180px]"
+                 />
+              </div>
+              <input 
+                type="text" 
+                readOnly 
+                value={qrData.link} 
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-[10px] font-mono text-muted-foreground focus:outline-none truncate"
               />
+              <button 
+                onClick={() => { navigator.clipboard.writeText(qrData.link); alert('Node link copied!'); }}
+                className="w-full bg-white/5 hover:bg-white/10 text-foreground font-bold py-2.5 rounded-xl transition-all text-sm border border-white/5"
+              >
+                Copy Direct Link
+              </button>
            </div>
-           <div className="w-full">
-             <input 
-               type="text" 
-               readOnly 
-               value={qrLink} 
-               className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-xs font-mono text-muted-foreground focus:outline-none"
-             />
+
+           <div className="w-px h-64 bg-white/5 hidden md:block self-center" />
+
+           {/* Subscription Link QR */}
+           <div className="flex-1 flex flex-col items-center gap-4">
+              <span className="text-xs font-black uppercase tracking-widest text-orange-400">Subscription URL</span>
+              <div className="bg-white p-3 rounded-2xl shadow-xl border-4 border-orange-500/20">
+                 <img 
+                   src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(qrData.sub)}`} 
+                   alt="Sub QR"
+                   className="w-[180px] h-[180px]"
+                 />
+              </div>
+              <input 
+                type="text" 
+                readOnly 
+                value={qrData.sub} 
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-[10px] font-mono text-muted-foreground focus:outline-none truncate"
+              />
+              <button 
+                onClick={() => { navigator.clipboard.writeText(qrData.sub); alert('Sub link copied!'); }}
+                className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-2.5 rounded-xl transition-all text-sm shadow-lg shadow-orange-500/20"
+              >
+                Copy Sub URL
+              </button>
            </div>
-           <button 
-             onClick={() => {
-               navigator.clipboard.writeText(qrLink);
-               setQrModalOpen(false);
-             }}
-             className="w-full bg-primary hover:bg-primary/90 text-white font-bold py-3 rounded-2xl transition-all"
-           >
-             Copy Link & Close
-           </button>
         </div>
       </Modal>
     </div>
