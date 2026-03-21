@@ -101,9 +101,12 @@ export default function ClientList() {
     const subId = client.subId || '';
     if (!subId) return alert('No subscription ID found for this client');
     
-    const panelDomain = (settings?.server_ip) || window.location.hostname;
+    const panelDomain = settings?.panel_domain || settings?.server_ip || window.location.hostname;
+    const subPort = settings?.sub_port || '';
+    const subPath = settings?.sub_path || '/api/sub/';
     const protocol = window.location.protocol;
-    const subUrl = `${protocol}//${panelDomain}/api/sub/${subId}`;
+
+    const subUrl = `${protocol}//${panelDomain}${subPort ? `:${subPort}` : ''}${subPath.endsWith('/') ? subPath : subPath + '/'}${subId}`;
     
     navigator.clipboard.writeText(subUrl);
     alert('Subscription link copied to clipboard!');
@@ -216,10 +219,11 @@ export default function ClientList() {
     const link = generateShareLink(client);
     const subId = client.subId || '';
     
-    // Correctly construct panel URL for sub
-    const panelDomain = (settings?.server_ip) || window.location.host;
+    const panelDomain = settings?.panel_domain || settings?.server_ip || window.location.hostname;
+    const subPort = settings?.sub_port || '';
+    const subPath = settings?.sub_path || '/api/sub/';
     const protocol = window.location.protocol;
-    const subUrl = `${protocol}//${panelDomain}/api/sub/${subId}`;
+    const subUrl = `${protocol}//${panelDomain}${subPort ? `:${subPort}` : ''}${subPath.endsWith('/') ? subPath : subPath + '/'}${subId}`;
 
     if (link) {
       setQrData({ link, sub: subUrl });

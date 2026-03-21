@@ -27,6 +27,9 @@ export default async function subRoutes(fastify: FastifyInstance, options: Fasti
     }
 
     const masterIp = await settingsService.getSetting('server_ip', '127.0.0.1') as string;
+    const panelDomain = await settingsService.getSetting('panel_domain', masterIp) as string;
+    const subPort = await settingsService.getSetting('sub_port', '4000') as string;
+    const subPath = await settingsService.getSetting('sub_path', '/api/sub/') as string;
 
     const links = clients.map(client => {
       const inbound = client.inbound;
@@ -38,6 +41,12 @@ export default async function subRoutes(fastify: FastifyInstance, options: Fasti
 
       return generateProxyUri(inbound, client, host);
     }).filter(Boolean) as string[];
+
+    const sslCert = await settingsService.getSetting('ssl_cert');
+    const sslKey = await settingsService.getSetting('ssl_key');
+    const protocol = (sslCert && sslKey) ? 'https' : 'http';
+    // Construct the subscription URL strictly based on settings if provided
+    const baseSubUrl = `${protocol}://${panelDomain}${subPort ? `:${subPort}` : ''}${subPath.endsWith('/') ? subPath : subPath + '/'}${subId}`;
 
     // Detect browser vs client
     const acceptHeader = request.headers.accept || '';
@@ -79,11 +88,11 @@ export default async function subRoutes(fastify: FastifyInstance, options: Fasti
                     <span class="title">Your Subscription Link</span>
                     <div class="flex-row">
                         <div class="qr-box">
-                            <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`${request.protocol || 'http'}://${request.hostname}${request.url}`)}" alt="Sub QR">
+                            <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(baseSubUrl)}" alt="Sub QR">
                         </div>
                         <div style="flex: 1;">
-                            <div class="link">${request.protocol}://${request.hostname}${request.url}</div>
-                            <button class="btn" onclick="copy('${`${request.protocol || 'http'}://${request.hostname}${request.url}`}')">Copy Sub Link</button>
+                            <div class="link">${baseSubUrl}</div>
+                            <button class="btn" onclick="copy('${baseSubUrl}')">Copy Sub Link</button>
                         </div>
                     </div>
                 </div>
