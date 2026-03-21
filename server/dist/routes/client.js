@@ -25,6 +25,7 @@ async function clientRoutes(fastify, options) {
         const [client] = await db_1.db.insert(schema_1.clients).values({
             id: (0, xray_utils_1.generateUuid)(),
             inboundId: body.inboundId,
+            subId: body.subId || (0, xray_utils_1.generateUuid)(), // ID for grouping in subscription
             email: body.email,
             uuid: uuid,
             flow: body.flow || null,
@@ -37,6 +38,25 @@ async function clientRoutes(fastify, options) {
         });
         await xrayService.restart();
         return client;
+    });
+    fastify.put('/:id', async (request, reply) => {
+        const { id } = request.params;
+        const body = request.body;
+        await db_1.db.update(schema_1.clients)
+            .set({
+            email: body.email,
+            uuid: body.uuid,
+            subId: body.subId,
+            flow: body.flow,
+            limitIp: body.limitIp,
+            totalGb: body.totalGb,
+            enabled: body.enabled,
+            expiry: body.expiry ? new Date(body.expiry) : null,
+            updatedAt: new Date(),
+        })
+            .where((0, drizzle_orm_1.eq)(schema_1.clients.id, id));
+        await xrayService.restart();
+        return { success: true };
     });
     fastify.delete('/:id', async (request, reply) => {
         const { id } = request.params;

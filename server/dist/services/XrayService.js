@@ -41,11 +41,12 @@ const child_process_1 = require("child_process");
 const fs = __importStar(require("fs-extra"));
 const path_1 = __importDefault(require("path"));
 const db_1 = require("../db");
+const SettingsService_1 = require("./SettingsService");
 class XrayService {
     constructor() {
         this.process = null;
-        this.configPath = path_1.default.join(process.cwd(), 'xray_config.json');
-        this.xrayBinary = process.platform === 'win32' ? 'xray.exe' : 'xray';
+        this.logs = [];
+        this.maxLogs = 500;
     }
     static getInstance() {
         if (!XrayService.instance) {
@@ -53,42 +54,84 @@ class XrayService {
         }
         return XrayService.instance;
     }
-    async generateConfig() {
-        const inboundsData = await db_1.db.query.inbounds.findMany({
+    async generateConfig(externalInbounds) {
+        const inboundsData = externalInbounds || await db_1.db.query.inbounds.findMany({
             with: {
                 clients: true
             }
         });
-        const xrayInbounds = inboundsData.map(inbound => {
-            const settings = JSON.parse(inbound.settings);
-            // Map clients from our DB into the settings expected by Xray
-            if (inbound.protocol === 'vless' || inbound.protocol === 'vmess' || inbound.protocol === 'trojan') {
-                settings.clients = inbound.clients.map(client => ({
-                    id: client.uuid,
-                    email: client.email,
-                    flow: client.flow || undefined,
-                }));
+        const xrayInbounds = inboundsData
+            .filter(inbound => {
+            const port = Number(inbound.port);
+            if (port <= 0 || port > 65535 || !Number.isInteger(port)) {
+                console.warn(`[XrayService] Skipping inbound '${inbound.tag}' with invalid port: ${inbound.port}`);
+                return false;
+            }
+            return true;
+        })
+            .map(inbound => {
+            let settings = { clients: [] };
+            try {
+                const dbSettings = JSON.parse(inbound.settings);
+                // We only need clients and specific fields, strip any trash
+                if (dbSettings.clients)
+                    settings.clients = dbSettings.clients;
+            }
+            catch (e) { }
+            // Map clients from our DB
+            settings.clients = inbound.clients.map((client) => ({
+                id: client.uuid,
+                email: client.email,
+                flow: client.flow === 'none' || !client.flow ? undefined : client.flow,
+            }));
+            if (inbound.protocol === 'vless') {
+                settings.decryption = "none";
+                settings.fallbacks = [];
+            }
+            const stream = JSON.parse(inbound.stream);
+            // CRITICAL: Reality SERVER must NOT have publicKey in its config.
+            // It only needs privateKey. publicKey is for clients only.
+            if (stream.realitySettings) {
+                delete stream.realitySettings.publicKey;
+                if (Array.isArray(stream.realitySettings.shortIds)) {
+                    stream.realitySettings.shortIds = stream.realitySettings.shortIds.filter((s) => s && s.trim().length > 0);
+                }
             }
             return {
                 tag: inbound.tag,
                 port: inbound.port,
                 protocol: inbound.protocol,
                 settings: settings,
-                streamSettings: JSON.parse(inbound.stream),
+                streamSettings: stream,
                 sniffing: JSON.parse(inbound.sniffing)
             };
         });
+        const settingsService = SettingsService_1.SettingsService.getInstance();
+        // Load config sections from settings
+        const logSection = JSON.parse(await settingsService.getSetting('xray_config_log', '{"loglevel":"warning"}'));
+        const dnsSection = JSON.parse(await settingsService.getSetting('xray_config_dns', '{"servers":["1.1.1.1"]}'));
+        const outboundsSection = JSON.parse(await settingsService.getSetting('xray_config_outbounds', '[{"protocol":"freedom","tag":"direct"},{"protocol":"blackhole","tag":"blocked"}]'));
+        const routingSection = JSON.parse(await settingsService.getSetting('xray_config_routing', '{"rules":[]}'));
+        const policySection = JSON.parse(await settingsService.getSetting('xray_config_policy', '{"levels":{"0":{"statsUserUplink":true,"statsUserDownlink":true}}}'));
+        // Ensure api rule exists
+        if (!routingSection.rules)
+            routingSection.rules = [];
+        if (!routingSection.rules.find((r) => r.inboundTag?.[0] === 'api')) {
+            routingSection.rules.unshift({ type: "field", inboundTag: ["api"], outboundTag: "api" });
+        }
+        // Ensure blackhole outbound exists
+        if (!outboundsSection.find((o) => o.tag === 'blocked')) {
+            outboundsSection.push({ protocol: "blackhole", tag: "blocked" });
+        }
         const config = {
-            log: { loglevel: "warning" },
-            stats: {}, // Enable stats
+            log: logSection,
+            stats: {},
+            dns: dnsSection,
             api: {
                 tag: "api",
                 services: ["HandlerService", "StatsService"]
             },
-            policy: {
-                levels: { "0": { statsUserUplink: true, statsUserDownlink: true } },
-                system: { statsInboundUplink: true, statsInboundDownlink: true }
-            },
+            policy: policySection,
             inbounds: [
                 ...xrayInbounds,
                 {
@@ -99,33 +142,67 @@ class XrayService {
                     tag: "api"
                 }
             ],
-            outbounds: [
-                { protocol: "freedom", tag: "direct" },
-                { protocol: "blackhole", tag: "blocked" }
-            ],
-            routing: {
-                rules: [
-                    { type: "field", inboundTag: ["api"], outboundsTag: "api" }
-                ]
-            }
+            outbounds: outboundsSection,
+            routing: routingSection
         };
-        await fs.writeJSON(this.configPath, config, { spaces: 2 });
-        return this.configPath;
+        const configPath = await settingsService.getSetting('xray_config_path', path_1.default.join(process.cwd(), 'xray_config.json'));
+        await fs.writeJSON(configPath, config, { spaces: 2 });
+        return configPath;
     }
-    async start() {
-        await this.generateConfig();
+    async start(externalInbounds) {
+        const configPath = await this.generateConfig(externalInbounds);
         this.stop();
-        if (!fs.existsSync(this.xrayBinary)) {
-            console.warn(`Xray binary not found at ${this.xrayBinary}. Skipping process start.`);
+        const settingsService = SettingsService_1.SettingsService.getInstance();
+        const xrayBinary = await settingsService.getSetting('xray_binary', process.platform === 'win32' ? 'xray.exe' : '/usr/local/bin/xray');
+        if (!fs.existsSync(xrayBinary)) {
+            this.addLog(`[Error] Xray binary not found at ${xrayBinary}`);
+            console.warn(`Xray binary not found at ${xrayBinary}. Skipping process start.`);
             return;
         }
-        this.process = (0, child_process_1.spawn)(this.xrayBinary, ['-c', this.configPath], {
-            stdio: 'inherit'
+        // Validate config before launching
+        try {
+            const testResult = (0, child_process_1.execSync)(`"${xrayBinary}" -test -config "${configPath}"`, { timeout: 10000 }).toString();
+            this.addLog(`[System] Config validation OK: ${testResult.trim()}`);
+        }
+        catch (testErr) {
+            const errMsg = (testErr.stdout?.toString() || '') + (testErr.stderr?.toString() || '') || testErr.message;
+            this.addLog(`[Fatal] Xray config validation FAILED — check your inbound settings!`);
+            this.addLog(`[Fatal] ${errMsg}`);
+            console.error('Xray config test failed:', errMsg);
+            return;
+        }
+        this.addLog(`[System] Starting Xray core with binary: ${xrayBinary}`);
+        this.process = (0, child_process_1.spawn)(xrayBinary, ['-c', configPath], {
+            stdio: ['ignore', 'pipe', 'pipe']
+        });
+        this.process.stdout?.on('data', (data) => {
+            this.addLog(data.toString());
+        });
+        this.process.stderr?.on('data', (data) => {
+            this.addLog(`[Xray] ${data.toString()}`);
         });
         this.process.on('close', (code) => {
+            this.addLog(`[System] Xray process exited with code ${code}`);
             console.log(`Xray process exited with code ${code}`);
             this.process = null;
         });
+    }
+    addLog(message) {
+        const lines = message.split('\n').filter(l => l.trim());
+        for (const line of lines) {
+            const formatted = `[${new Date().toLocaleTimeString()}] ${line}`;
+            this.logs.push(formatted);
+            console.log(formatted); // Print to console for journalctl
+        }
+        if (this.logs.length > this.maxLogs) {
+            this.logs = this.logs.slice(this.logs.length - this.maxLogs);
+        }
+    }
+    getLogs() {
+        return this.logs;
+    }
+    isRunning() {
+        return this.process !== null;
     }
     stop() {
         if (this.process) {

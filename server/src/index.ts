@@ -17,6 +17,16 @@ import nodeRoutes from './routes/node';
 
 import fs from 'fs-extra';
 
+process.on('uncaughtException', (err) => {
+  console.error(`\n[FATAL CRASH] Uncaught Exception:`, err.message);
+  console.error(err.stack);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('\n[FATAL BUG] Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
 async function start() {
   let fastify: any;
   try {

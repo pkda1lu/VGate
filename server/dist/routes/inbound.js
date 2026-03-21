@@ -20,6 +20,11 @@ async function inboundRoutes(fastify, options) {
         if (!body.tag || !body.port || !body.protocol) {
             return reply.code(400).send({ error: 'Missing required fields' });
         }
+        const port = parseInt(body.port);
+        if (isNaN(port) || port <= 0 || port > 65535) {
+            return reply.code(400).send({ error: 'Invalid port: must be between 1 and 65535' });
+        }
+        body.port = port;
         let streamSettings = body.stream || {};
         // Auto-generate Reality keys for VLESS inbounds
         if (body.protocol === 'vless' && !streamSettings.realitySettings) {
@@ -33,6 +38,7 @@ async function inboundRoutes(fastify, options) {
                     xver: 0,
                     serverNames: ["google.com", "www.google.com"],
                     privateKey: keys.privateKey,
+                    publicKey: keys.publicKey,
                     minClientVer: "",
                     maxClientVer: "",
                     maxTimeDiff: 0,
@@ -42,14 +48,43 @@ async function inboundRoutes(fastify, options) {
         }
         const [inbound] = await db_1.db.insert(schema_1.inbounds).values({
             tag: body.tag,
+            nodeId: body.nodeId || 1,
+            isGlobal: body.isGlobal || false,
             port: body.port,
             protocol: body.protocol,
             settings: JSON.stringify(body.settings || { clients: [], decryptions: [] }),
             sniffing: JSON.stringify(body.sniffing || { enabled: true, destOverride: ["http", "tls"] }),
-            stream: JSON.stringify(streamSettings),
+            stream: JSON.stringify(body.stream || streamSettings),
         }).returning();
         await xrayService.restart();
         return inbound;
+    });
+    fastify.get('/generate-reality', async () => {
+        const keys = (0, xray_utils_1.generateRealityKeys)();
+        return {
+            privateKey: keys.privateKey,
+            publicKey: keys.publicKey,
+            shortId: (0, xray_utils_1.generateShortId)()
+        };
+    });
+    fastify.put('/:id', async (request, reply) => {
+        const { id } = request.params;
+        const body = request.body;
+        await db_1.db.update(schema_1.inbounds)
+            .set({
+            tag: body.tag,
+            nodeId: body.nodeId,
+            isGlobal: body.isGlobal,
+            port: body.port,
+            protocol: body.protocol,
+            settings: JSON.stringify(body.settings),
+            sniffing: JSON.stringify(body.sniffing),
+            stream: JSON.stringify(body.stream),
+            updatedAt: new Date(),
+        })
+            .where((0, drizzle_orm_1.eq)(schema_1.inbounds.id, parseInt(id)));
+        await xrayService.restart();
+        return { success: true };
     });
     fastify.delete('/:id', async (request, reply) => {
         const { id } = request.params;
